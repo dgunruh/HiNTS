@@ -1,0 +1,2 @@
+Diameter(nm) Mobility(cm/Vs) STD_Mean
+6.6 2.23228530143835 0.11781207353580822

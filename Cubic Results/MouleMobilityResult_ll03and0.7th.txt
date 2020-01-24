@@ -1,0 +1,2 @@
+SampleNumber Mobility(cm^2/Vs) Pair_STD
+0 4.347768208214747 0.3200131718996952
