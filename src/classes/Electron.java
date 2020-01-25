@@ -19,7 +19,6 @@ public class Electron extends Charge {
 	
 	
 	public double lookForEvents(Sample sample) {
-		//System.out.println(this.hostNP);
 		double degeneracy;
 		double netDistance;
 		double newRate;
@@ -70,9 +69,7 @@ public class Electron extends Charge {
 	
 					// allow hopping only towards nanoparticles with a lower energy level
 					netDistance = (neighborNP.z-sourceNP.z-sample.cellz*Math.round((neighborNP.z-sourceNP.z)/sample.cellz));
-					//System.out.println(charge*sample.voltage*netDistance/sample.cellz);
 					energy_diff += charge*sample.voltage*netDistance/sample.cellz;
-					//energy_diff < 0
 					
 					double neckRadius = sourceNP.neckRadiusMap.get(neighborNP);
 					double diameter = (sourceNP.diameter + neighborNP.diameter)/2.0;
@@ -107,7 +104,6 @@ public class Electron extends Charge {
 						double matrixElement = 9*electron_density*Math.pow(neckRadius, 3.0)/(Configuration.emass*Math.pow(diameter, 2.0));
 						
 						double thermal_activation = Math.exp(-energy_diff/sample.temperature);
-						//System.out.println("Thermal activation is: " + thermal_activation);
 						newRate = 2*Math.PI*Math.pow(matrixElement, 2.0)*degeneracy*thermal_activation; //make sure rate crosses over from hopping
 						newEvent.setRate(newRate);
 						this.hoppings.add(newEvent);
@@ -127,7 +123,6 @@ public class Electron extends Charge {
 						newEvent = new HoppingEvent(this, neighborNP, sourceNP, band, sourceOrbital, false);
 						newRate = degeneracy*calculateRate(neighborNP, sourceNP, band, sourceOrbital, sample);
 						newEvent.setRate(newRate);
-						//System.out.println("Hopping rate is: " + newRate);
 						this.hoppings.add(newEvent);
 						ratesOnCharge += newRate;
 					}
@@ -162,8 +157,6 @@ public class Electron extends Charge {
 	    		+ sourceNP.calculateOnSiteElectronCharging((sourceNP.occupationTotalElectron-1)));
 	    
 	    return (chargingAfter-chargingBefore)/sample.screeningFactor;
-	    
-		//return charging/Configuration.screeningFactor;
     }
 	
 	private double calculateExciton(Nanoparticle targetNP, Nanoparticle sourceNP, Sample sample){
@@ -191,7 +184,6 @@ public class Electron extends Charge {
 		double excitonAfter = -targetNP.calculateOnSiteExcitonCharging(targetNP.occupationTotalElectron + 1, targetNP.occupationTotalHoles, sample)
 				- sourceNP.calculateOnSiteExcitonCharging(sourceNP.occupationTotalElectron - 1, sourceNP.occupationTotalHoles, sample);
 		
-		//System.out.println("Exciton interaction is: " + (excitonAfter - excitonBefore)/sample.screeningFactor);
 		return (excitonAfter - excitonBefore)/sample.screeningFactor;
     }
 
@@ -266,6 +258,8 @@ public class Electron extends Charge {
 				//rate = 0.0;
 				System.out.println("hitting it");
 			}
+			
+			//This is an implementation of the overlap energy for samples with disorder. A stopgap measure
 			if(energy_diff > sample.ediff_hopping_thr) {
 				rate = rate*Math.exp(-energy_diff/sample.temperature);
 				//System.out.println("Rate is: " + rate);
@@ -299,9 +293,6 @@ public class Electron extends Charge {
     
     
     public void move(Nanoparticle sourceNP, int sourceBand, Nanoparticle destinationNP, int destinationBand) {
-		
-    	//System.out.println("moving electron "+this);
-    	//System.out.println("destinationNP is "+destinationNP+", sourceNP is "+sourceNP);
 		// remove from old NP first
     	sourceNP.remove_electron(this, sourceBand);
     	// add to the new NP

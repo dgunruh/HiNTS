@@ -23,52 +23,50 @@ class Processor implements Callable<Double[]> {
 	private int order_id;
 	private double temp;
 	private int nelec;
-	private double diam;
-	private int crack;
 	private double screeningFactor;
 	private boolean randomSeed;
 	private boolean necking;
 	private double voltageRatio = 1.0;
-	private String disorder;
+	private String folderName;
 	Double[] result;
 	
-	public Processor(int id, double temp, double diam, int nelec, int crackLength, double screeningFactor, boolean randomSeed, boolean necking, String disorder){
+	//here we allow different calls by overloading the constructor
+	//base processor
+	public Processor(String folderName, int id, double temp, int nelec, double screeningFactor, boolean randomSeed, boolean necking){
 		this.id = id;
 		this.order_id = id;
 		this.temp = temp;
 		this.nelec = nelec;
-		this.diam = diam;
-		this.crack = crackLength;
 		this.screeningFactor = screeningFactor;
 		this.randomSeed = randomSeed;
 		this.necking = necking;
-		this.disorder = disorder;
+		this.folderName = folderName;
 	}
 	
-	public Processor(int id, double temp, double diam, int nelec, int crackLength, double screeningFactor, boolean randomSeed, boolean necking, double voltageRatio){
+	//voltage processor
+	public Processor(String folderName, int id, double temp, int nelec, double screeningFactor, boolean randomSeed, boolean necking, double voltageRatio){
 		this.id = id;
 		this.order_id = id;
 		this.temp = temp;
 		this.nelec = nelec;
-		this.diam = diam;
-		this.crack = crackLength;
 		this.screeningFactor = screeningFactor;
 		this.randomSeed = randomSeed;
 		this.necking = necking;
-		this.voltageRatio = voltageRatio;
+		this.voltageRatio = voltageRatio; //this is the unique feature
+		this.folderName = folderName;
 		
 	}
 	
-	public Processor(int id, int order_id, double temp, double diam, int nelec, int crackLength, double screeningFactor, boolean randomSeed, boolean necking){
+	//repeat sample simulations processor
+	public Processor(String folderName, int id, int order_id, double temp, int nelec, double screeningFactor, boolean randomSeed, boolean necking){
 		this.id = id;
-		this.order_id = order_id;
+		this.order_id = order_id; //this is the unique feature
 		this.temp = temp;
 		this.nelec = nelec;
-		this.diam = diam;
-		this.crack = crackLength;
 		this.screeningFactor = screeningFactor;
 		this.randomSeed = randomSeed;
 		this.necking = necking;
+		this.folderName = folderName;
 	}
 
 	@Override
@@ -79,28 +77,24 @@ class Processor implements Callable<Double[]> {
 		
 		Map<String, Object> params = new HashMap<>();
 		
-		//int nholes = (int) Math.round(nelec/4.0); for troubleshooting purposes
-		int nholes = 0;
+		int nholes = 0; //(int) Math.round(nelec/4.0); for troubleshooting purposes
 		params.put("nelec", nelec);
 		params.put("nholes", nholes);
 		params.put("expected_nnanops", 800); //was 1200
+		params.put("folderName", folderName);
 		params.put("sample_no", id);
 		params.put("feature", "mobility");
 		params.put("voltage_ratio", voltageRatio);
 		params.put("temperature", temp);
 		params.put("closeNeighbor_thr", 0.0);
 		params.put("neckedNeighbor_thr", 0.7); //0.42 allows the O_E to go up to kT. //Was 0.7
-		params.put("np_diam",diam);
-		params.put("crack_length", crack);
 		params.put("screeningFactor", screeningFactor);
 		params.put("randomSeed", randomSeed);
 		params.put("necking", necking);
-		params.put("disorder", disorder);
 		
 		Sample newsample = new Sample(params);
-		//int copyNum = id%20;
+		
 		// the first element is the id, the second element is the actual result
-		//result[0] = (double) copyNum;
 		result[0] = (double) order_id;
 		result[1] = newsample.simulation();
 		
@@ -115,23 +109,23 @@ public class App {
 	public static void main(String[] args) throws FileNotFoundException {
 		
 		int numberOfSamples = 40;
+		String numberOfNanoparticles = "800"; //expected number
 		int sampleStart = 0;
-		double size_std = 0;
-		String stdMethod = "percent";
 		String npArraySize = "20x2x20";
 		String eDensity = ".00201";
 		String diameter = "6.5";
 		String defect = "twins";
 		double T = 100.0;
 		boolean randomSeed = false; //whether our MersenneTwisterFast will always use the same seeds, or random seeds
-		boolean necking = false;
+		boolean necking = false; //whether the simulation samples will have necking or not
 		
+		//These are the various types of runs that can be conducted
 		boolean multipleDiameters = false; //cycle through batches of NPs at different diameters
 		boolean repeatCalculations = false; //repeat mobility calculations for the same samples. Use random number as seed
 		boolean linearElectronFilling = false; //cycle through electron filling for samples
-		boolean ivCurve = false;
-		boolean multipleTemperatures = true;
-		//if none, then will simply go through single batch of samples
+		boolean ivCurve = false; //generate a curve of current versus voltage
+		boolean multipleTemperatures = true; //cycle through multiple temperatures
+		//if none of the above are "true", then will simply go through single batch of samples with no frills
 		
 		if(multipleDiameters) {
 			List<Integer> nelecList = Arrays.asList(76, 109, 150, 199, 259, 329, 411, 506, 614, 736, 874, 1028, 1200, 1389, 1597, 1825, 2073); //.0015e-/nm^3 .5 ll
@@ -150,11 +144,10 @@ public class App {
 					System.out.println("Number of electrons is " + nelec);
 					ExecutorService executor = Executors.newFixedThreadPool(4);
 					List<Future<Double[]>> futures = new ArrayList<>();
-		
-		
-					int crack = 0;
+					
+					String folderName = numberOfNanoparticles +"_"+diam + "nm";
 					for(int i=0; i<numberOfSamples; i++){
-						futures.add(executor.submit(new Processor(i,T,diam,nelec,crack,screeningFactor, randomSeed, necking, " ")));
+						futures.add(executor.submit(new Processor(folderName, i,T,nelec,screeningFactor, randomSeed, necking)));
 					}
 		
 					// Stop accepting new tasks. Wait for all threads to terminate.
@@ -225,9 +218,9 @@ public class App {
 				List<Future<Double[]>> futures = new ArrayList<>();
 	
 	
-	
+				String folderName = numberOfNanoparticles +"_"+diam + "nm";
 				for(int i=0; i<numberOfSamples; i++){
-					futures.add(executor.submit(new Processor(i,T,diam,nelec, crack,screeningFactor, randomSeed, necking, "0")));
+					futures.add(executor.submit(new Processor(folderName, i,T,nelec,screeningFactor, randomSeed, necking)));
 				}
 	
 				// Stop accepting new tasks. Wait for all threads to terminate.
@@ -292,9 +285,9 @@ public class App {
 					List<Future<Double[]>> futures = new ArrayList<>();
 		
 		
-		
+					String folderName = numberOfNanoparticles +"_"+diam + "nm_200N_" + disorder;
 					for(int i=0; i<numberOfSamples; i++){
-						futures.add(executor.submit(new Processor(i,temp,diam,nelec, crack,screeningFactor, randomSeed, necking,disorder)));
+						futures.add(executor.submit(new Processor(folderName, i,temp,nelec,screeningFactor, randomSeed, necking)));
 					}
 		
 					// Stop accepting new tasks. Wait for all threads to terminate.
@@ -369,9 +362,9 @@ public class App {
 				List<Future<Double[]>> futures = new ArrayList<>();
 	
 	
-	
+				String folderName = numberOfNanoparticles +"_"+diam + "nm";
 				for(int i=0; i<numberOfSamples; i++){
-					futures.add(executor.submit(new Processor(i,T,diam,nelec, crack,screeningFactor, randomSeed, necking, voltageRatio)));
+					futures.add(executor.submit(new Processor(folderName, i,T,nelec,screeningFactor, randomSeed, necking, voltageRatio)));
 				}
 	
 				// Stop accepting new tasks. Wait for all threads to terminate.
@@ -430,15 +423,16 @@ public class App {
 			for(int k = 0; k < 1; k++) {
 				ExecutorService executor = Executors.newFixedThreadPool(4);
 				List<Future<Double[]>> futures = new ArrayList<>();
-	
+				String folderName = numberOfNanoparticles +"_"+diam + "nm";
+				
 				//submit jobs with an ordering id separate from their actual sample id
 				//this will allow us to average over groups of runs on the same sample
 				for(int i=0; i<numberOfSamples; i+=2){
 					for(int j=0; j<repetitions; j++) {
 						int nonflippedID = i*repetitions + 2*j;
 						int flippedID = i*repetitions + 2*j + 1;
-						futures.add(executor.submit(new Processor(i,nonflippedID, T,diam,nelec,0,screeningFactor, randomSeed, necking)));
-						futures.add(executor.submit(new Processor(i+1,flippedID, T,diam,nelec,0, screeningFactor, randomSeed, necking)));
+						futures.add(executor.submit(new Processor(folderName, i,nonflippedID, T,nelec,screeningFactor, randomSeed, necking)));
+						futures.add(executor.submit(new Processor(folderName, i+1,flippedID, T,nelec, screeningFactor, randomSeed, necking)));
 					}
 				}
 	
@@ -531,9 +525,9 @@ public class App {
 			ExecutorService executor = Executors.newFixedThreadPool(4);
 			List<Future<Double[]>> futures = new ArrayList<>();
 
-
+			String folderName = numberOfNanoparticles +"_"+diam + "nm";
 			for(int i=0; i<numberOfSamples; i++){
-				futures.add(executor.submit(new Processor(i + sampleStart,i, T,diam,nelec,0, screeningFactor, randomSeed, necking)));
+				futures.add(executor.submit(new Processor(folderName, i + sampleStart,i, T,nelec, screeningFactor, randomSeed, necking)));
 			}
 
 			// Stop accepting new tasks. Wait for all threads to terminate.

@@ -47,9 +47,10 @@ public class Sample {
     public double cellx, celly, cellz, cellz_nm;
     public double rateOnSample = 0;
     public double systemEnergy = 0;
-    long sampleCurrent;
+    long sampleCurrent = 0;
     public double elapsedTime = 0.0;
     
+    public String folderName; //the folder where the nanoparticle data is stored
     public int nelec   ;   // number of electrons
     public int nelec_0 ;   // starting number of electrons
     public int nhole   ;   // number of holes
@@ -58,15 +59,13 @@ public class Sample {
     int sample_number  ;   // store the nanoparticle file to open
     double closeNeighbor_thr; // percentage read from program
     double neckedNeighbor_thr; // percentage read from program
-    public double np_diam ; //nanoparticle diameter
-    public int crack   ; //length of crack stretching across sample
     public double screeningFactor; //how much to reduce charging energy by, if necessary
     public boolean randomSeed; //do we use a random seed for MersenneTwisterFast, or preset seed
     public boolean necking; //are the nanoparticles necked together
   
     double npdc, liganddc, metalPrefactor, FWHM;
     double average_spacing = 2*Configuration.ligandLength*Constants.nmtobohr;
-    String filename, feature, disorder;
+    String filename, feature;
     
     
     //
@@ -95,13 +94,10 @@ public class Sample {
     	temperature = (double) params.get("temperature") * Constants.kelvintory;
     	closeNeighbor_thr = (double) params.get("closeNeighbor_thr");
     	neckedNeighbor_thr = (double) params.get("neckedNeighbor_thr");
-    	sampleCurrent = 0;
-    	np_diam = (double) params.get("np_diam");
-    	crack = (int) params.get("crack_length");
     	screeningFactor = (double) params.get("screeningFactor");
     	randomSeed = (boolean) params.get("randomSeed");
     	necking = (boolean) params.get("necking");
-    	disorder = (String) params.get("disorder");
+    	folderName = (String) params.get("folderName");
     	
     	if(feature=="mobility"){
     		//voltage = 0.5*30*Constants.kelvintory*0.1*25 / Constants.sqrt2; //25 nanoparticles, so each get this 30K voltage
@@ -248,7 +244,7 @@ public class Sample {
     	
     	if(!bimodal){
     		String prefix = "./data/";
-    		String middle = String.valueOf(nnanops)+"_"+np_diam + "nm" + "_200N_" + disorder; //_.03D"; // looking at grain boundaries
+    		String middle = folderName; //_.03D"; // looking at grain boundaries
     		String end = "/nanoparticles" + sample_number + ".inp";
     		
     		/* Moule project
@@ -299,7 +295,6 @@ public class Sample {
 		List<String> lines;
 		try {
 			lines = Files.readLines(new File(filename), Charsets.UTF_8);
-			//System.out.println(lines);
 			
 			/* For Moule style samples
 			cellx = Double.valueOf(Arrays.asList(lines.get(0).split(",")).get(1))*Constants.nmtobohr;
@@ -314,7 +309,6 @@ public class Sample {
 			cellx = Double.valueOf(Arrays.asList(lines.get(3).split(",")).get(1))*Constants.nmtobohr;
 			celly = Double.valueOf(Arrays.asList(lines.get(4).split(",")).get(1))*Constants.nmtobohr;
 			cellz = Double.valueOf(Arrays.asList(lines.get(5).split(",")).get(1))*Constants.nmtobohr;
-			//System.out.println("Cell x is: " + cellx*Constants.bohrtonm + " Cell y is: " + celly*Constants.bohrtonm  + "Cell z is: " + cellz*Constants.bohrtonm );
 			cellz_nm = cellz/Constants.nmtobohr;
 			
 			//leftmost_NP_z = cellz;
@@ -428,7 +422,7 @@ public class Sample {
 	}
     
     public void get_necked_neighbors() {
-    	String prefix= "./data/14x14x6/";
+    	String prefix= "./data/" + folderName;
 		String middle = "neckSample";
 		String end = String.valueOf(sample_number/2)+ ".inp";
 		
