@@ -185,8 +185,6 @@ public class Sample {
 				drains.add(NP);
 			}
     	}
-    	//System.out.println("Leftmost z: " + tempMin*Constants.bohrtonm);
-    	//System.out.println("Rightmost z: " + tempMax*Constants.bohrtonm);
     	
     }
     
@@ -623,13 +621,10 @@ public class Sample {
         	// randomly select a NP
     		NP = rng.nextInt(nanoparticles.length);
     		targetNP = nanoparticles[NP];
-    		//System.out.println("target NP "+targetNP+ " "+NP);
-    		//System.out.println(targetNP.electronsOnNP[0]);
     		for(int i=0; i<nbnd; i++){
     			if(targetNP.occupationCB[i] < targetNP.occupationMAX[i]){
     				// put electron onto ith orbital on targetNP
     				e.setHost(targetNP, i);
-    				//targetNP.electronsOnNP[i].add(e);
     				targetNP.add_electron(e, i);
     				
     				double[] destination = {targetNP.x, targetNP.z};
@@ -638,8 +633,6 @@ public class Sample {
     			}
     		}
 			trials++;
-			
-	    	//System.out.println(targetNP.electronsOnNP[0]);
 			
     	}
     	
@@ -664,13 +657,11 @@ public class Sample {
     			if(targetNP.occupationVB[i] < targetNP.occupationMAX[i]){
     				// put hole onto ith orbital on targetNP
     				h.setHost(targetNP, i);
-    				//targetNP.electronsOnNP[i].add(e);
     				targetNP.add_hole(h, i);
     				success = true;
     			}
     		}
 			trials++;
-	    	//System.out.println(targetNP.electronsOnNP[0]);
     	}
     	if(!success)
     		System.out.println("Not able to throw hole within max trials!");
@@ -691,14 +682,11 @@ public class Sample {
         	// randomly select a NP
     		NP = rng.nextInt(nanoparticles.length);
     		targetNP = nanoparticles[NP];
-    		//System.out.println("target NP "+targetNP+ " "+NP);
-    		//System.out.println(targetNP.electronsOnNP[0]);
     		for(int i=0; i<nbnd; i++){
     			if(targetNP.occupationCB[i] + 1 < targetNP.occupationMAX[i]){
-    				// put electron onto ith orbital on targetNP
+    				// put electron and hole onto ith orbital on targetNP
     				e.setHost(targetNP, i);
     				h.setHost(targetNP, i);
-    				//targetNP.electronsOnNP[i].add(e);
     				targetNP.add_electron(e, i);
     				targetNP.add_hole(h, i);
     				success = true;
@@ -709,24 +697,20 @@ public class Sample {
     		}
 			trials++;
 			
-	    	//System.out.println(targetNP.electronsOnNP[0]);
-			
     	}
     	
     	if(!success)
     		System.out.println("Not able to throw exciton within max trials!");
 	}
     
-    // for electron hopping only at moment
+    // for both holes and electron hopping. NOT THOROUGHLY TESTED FOR HOLES
     private void initializeEvents() {
     	rateOnSample = 0.0;
 		for(Nanoparticle nanops : nanoparticles){
 			for(int band=0; band<nbnd; band++){
 				for(Electron electron : nanops.electronsOnNP[band]){
 					// look for events and calculate the system total rate
-					//System.out.println(electron+" events before "+ electron.hoppings);
 					rateOnSample += electron.lookForEvents(this);
-					//System.out.println(electron+" events after "+ electron.hoppings+ " total rate "+rateOnSample);
 
 				}
 				
@@ -752,16 +736,10 @@ public class Sample {
 	}
     
     
-    // only works with electron at the moment!!!
+    // not thoroughly tested for holes!!
     public HoppingEvent searchHoppingEvent()  {
-    	//System.out.println(rateOnSample);
     	double targetRate = rateOnSample*rng.nextDouble();
     	double currentRate = 0.0 ;
-    	
-    	
-    	//System.out.println(targetRate+" "+ rateOnSample);
-    	
-    	//latestEvent = new HoppingEvent();
     	
 		// loop over all nanoparticles
 		for(Nanoparticle nanop : nanoparticles){
@@ -774,12 +752,9 @@ public class Sample {
 						// update latest event to return
 						// add current event rate
 						currentRate += event.rate;
-						//System.out.println(e+" current rate "+currentRate+" target rate "+targetRate);
 
 						if(currentRate>=targetRate){
     						latestEvent = event;
-    						//System.out.println("found event");
-    						//System.out.println("in search event "+event.targetNP.source +" " +event.sourceNP.drain);
 							return latestEvent;
 							}
 						}
@@ -791,12 +766,10 @@ public class Sample {
 						// update latest event to return
 						// add current event rate
 						currentRate += event.rate;
-						//System.out.println(e+" current rate "+currentRate+" target rate "+targetRate);
 
 						if(currentRate>=targetRate){
     						latestEvent = event;
     						System.out.println("found hole event");
-    						//System.out.println("in search event "+event.targetNP.source +" " +event.sourceNP.drain);
 							return latestEvent;
 						}
 					}
@@ -825,8 +798,6 @@ public class Sample {
     	System.out.println(targetRate<currentRate);
     	if(latestEvent.type=="empty")
     		System.out.println("empty events!"); 
-    	
-    	//System.out.println(latestEvent.sourceNP+" "+latestEvent.targetNP);
     	return latestEvent;
 	}
 
@@ -851,32 +822,18 @@ public class Sample {
     		Hole hMoving = event.hostHole;
     		hMoving.move(event.sourceNP, event.sourceOrbital, event.targetNP, event.targetOrbital);
     	}
-    	//System.out.println("executing event "+event+" hosting e is "+event.hostElectron);
-    	
-    	
-    	//before move
-    	
-    	//System.out.println("before moving "+eMoving+" "+event.targetNP.electronsOnNP[event.targetOrbital]);
-    	
-    	//System.out.println("after moving "+event.targetNP.electronsOnNP[event.targetOrbital]);
-    	
     	
     	// after move
     	if(i >= Configuration.MIN_THRESH_STEPS) {
     		if(electronEvent) {
 		    	if(event.targetNP.drain && event.sourceNP.source){
-		    		//System.out.println("exe");
 		    		current = -1;
 		    		this.sampleCurrent -= 1;
 		    	}
 		    	
 		    	if(event.targetNP.source && event.sourceNP.drain){
-		    		
 		    		current = 1;
 		    		this.sampleCurrent +=1 ;
-		        	//System.out.println(i);
-		
-		    		//System.out.println("in exe exeeee "+ event.targetNP.source +" " +event.sourceNP.drain);
 		    	}
     		}
     	}
@@ -1091,7 +1048,6 @@ public class Sample {
     	
     	
     	long l;
-    	//int numberEvents;
     	Nanoparticle source, target;
     	
     	l = System.nanoTime();
@@ -1119,11 +1075,9 @@ public class Sample {
     		target = currentEvent.targetNP;
     		
     		executeEvent(currentEvent, i);
-    		//System.out.println(rateOnSample);
     		double ry_timestep = -Math.log(rng.nextDouble())/rateOnSample; //time-step in Ry units
     		if(i >= Configuration.MIN_THRESH_STEPS) {
     			elapsedTime += ry_timestep*Constants.ry_ps; //elapsed time in ps
-    			//System.out.println("The current total rate is: " + rateOnSample);
     		}
     		
 //    		if(i - startSteps > 100000) {
@@ -1234,7 +1188,6 @@ public class Sample {
 
     	l = System.nanoTime() - l;
         System.out.println("iteration took " + l/1000000000 + "s");
-        //return sampleCurrent;
         return mobility;
     }
  
