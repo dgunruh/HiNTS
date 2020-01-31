@@ -128,7 +128,7 @@ public class Sample {
         ediff_thr = FWHM * closeNeighbor_thr;
         ediff_neck_thr = FWHM * neckedNeighbor_thr;
         
-        ediff_hopping_thr = .025*Constants.evtory; //an overlap energy of 5 meV
+        ediff_hopping_thr = .0*Constants.evtory; //an overlap energy of 5 meV
         if(necking) get_necked_neighbors();
         //get_necked_neighbors();
         buildNeighborList(false, true);

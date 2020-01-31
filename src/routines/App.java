@@ -269,14 +269,14 @@ public class App {
 		
 		else if(multipleTemperatures) {
 			double screeningFactor = 1.0;
-			List<String> disorderList = Arrays.asList(".02D",".03D",".04D",".05D",".06D", ".07D", ".08D");
+			List<String> disorderList = Arrays.asList(".01D", ".02D", ".03D", ".04D",".05D",".06D", ".07D", ".08D", ".09D");
 			for(String disorder: disorderList) {
 				//String disorder = ".01D";
-				String title = "TriDENS Results" + "\\" + Configuration.latticeStructure + "_" + diameter + "nm" +npArraySize + "_" + eDensity + "_"  + "disorder" + disorder +".txt";
+				String title = "TriDENS Results" + "/" + Configuration.latticeStructure + "_" + diameter + "nm" +npArraySize + "_" + eDensity + "_"  + "disorder" + disorder +".txt";
 				PrintWriter writer = new PrintWriter(title);
 				writer.println("Temperature(K) Mobility(cm^2/Vs) STD");
 				
-				for(double temp = 40.0; temp <= 90.0; temp += 10.0) {
+				for(double temp = 60.0; temp <= 80.0; temp += 5.0) {
 					int nelec = 801; //1 e- per NP
 					int crack = 0;
 					double diam = 6.5;
