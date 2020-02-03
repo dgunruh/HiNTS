@@ -108,7 +108,7 @@ public class App {
 
 	public static void main(String[] args) throws FileNotFoundException {
 		
-		int numberOfSamples = 40;
+		int numberOfSamples = 200;
 		String numberOfNanoparticles = "800"; //expected number
 		int sampleStart = 0;
 		String npArraySize = "20x2x20";
@@ -276,7 +276,7 @@ public class App {
 				PrintWriter writer = new PrintWriter(title);
 				writer.println("Temperature(K) Mobility(cm^2/Vs) STD");
 				
-				for(double temp = 60.0; temp <= 80.0; temp += 5.0) {
+				for(double temp = 65.0; temp <= 80.0; temp += 2.5) {
 					int nelec = 801; //1 e- per NP
 					int crack = 0;
 					double diam = 6.5;
