@@ -277,7 +277,7 @@ public class App {
 				writer.println("Temperature(K) Mobility(cm^2/Vs) STD");
 				
 				for(double temp = 65.0; temp <= 80.0; temp += 2.5) {
-					int nelec = 801; //1 e- per NP
+					int nelec = 800; //1 e- per NP
 					int crack = 0;
 					double diam = 6.5;
 					System.out.println("Temperature: " + temp);

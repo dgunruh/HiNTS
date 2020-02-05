@@ -67,6 +67,12 @@ public class Sample {
     double average_spacing = 2*Configuration.ligandLength*Constants.nmtobohr;
     String filename, feature;
     
+    //These are the parameters for the extra electron tracking
+    public double totalZeroElectronNanoparticles;
+    public double totalOneElectronNanoparticles;
+    public double totalTwoElectronNanoparticles;
+    public double totalThreeElectronNanoparticles;
+    
     
     //
     Nanoparticle[] nanoparticles;
@@ -1043,6 +1049,31 @@ public class Sample {
     	
     }
     
+    public void writeElectronAverages() {
+    	String currentDirectory = System.getProperty("user.dir");
+    	String folder = "TriDENS Results" + "/" + "ElectronAverages" + "/" + "Disorder" + folderName.substring(folderName.length() - 5) + "/" + "T" + Math.round(temperature*Constants.ry_to_kelvin*100.0)/100.0;
+    	File proposedFolder = new File(currentDirectory +"/" + folder);
+    	System.out.println(currentDirectory + "/" + folder);
+    	String title = folder + "/" + "Sample_" + sample_number+".txt";
+    	if(!proposedFolder.exists()) {
+    		//System.out.println("Made directory!");
+    		boolean madedir = proposedFolder.mkdirs();
+    		System.out.println(madedir);
+    	}
+		PrintWriter writer;
+		try {
+			writer = new PrintWriter(title);
+			writer.println("0 1 2 3");
+			int steps = Configuration.STEPS - Configuration.MIN_THRESH_STEPS;
+	    	writer.println(totalZeroElectronNanoparticles/steps + " " + totalOneElectronNanoparticles/steps + " "+ totalTwoElectronNanoparticles/steps + " " + totalThreeElectronNanoparticles/steps);
+    		writer.close();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	
+    }
+    
     public double simulation() throws FileNotFoundException{
     	
     	
@@ -1078,6 +1109,13 @@ public class Sample {
     		double ry_timestep = -Math.log(rng.nextDouble())/rateOnSample; //time-step in Ry units
     		if(i >= Configuration.MIN_THRESH_STEPS) {
     			elapsedTime += ry_timestep*Constants.ry_ps; //elapsed time in ps
+    			for(int j=0; j<nanoparticles.length; j++){
+    	    		int nElectrons = nanoparticles[j].occupationTotalElectron;
+    	    		if(nElectrons == 0) totalZeroElectronNanoparticles += 1.0;
+    	    		if(nElectrons == 1) totalOneElectronNanoparticles += 1.0;
+    	    		if(nElectrons == 2) totalTwoElectronNanoparticles += 1.0;
+    	    		if(nElectrons == 3) totalThreeElectronNanoparticles += 1.0;
+    			}
     		}
     		
 //    		if(i - startSteps > 100000) {
@@ -1188,6 +1226,9 @@ public class Sample {
 
     	l = System.nanoTime() - l;
         System.out.println("iteration took " + l/1000000000 + "s");
+	        
+        writeElectronAverages();
+        //return mobility;
         return mobility;
     }
  
