@@ -127,8 +127,12 @@ public class Sample {
 		
 		System.out.println("Number of Sources: " + sources.size());
 		System.out.println("Number of Drains: " + drains.size());
-		
-        FWHM = Setup.getFWHM(nanoparticles, this);
+		if(folderName.substring(folderName.length() - 4).equals(".00D")) {
+			FWHM = 0.0;
+		}
+		else {
+			FWHM = Setup.getFWHM(nanoparticles, this);
+		}
         System.out.println("FWHM is: " + FWHM*Constants.rytoev);
 		//FWHM = 0.1;
         ediff_thr = FWHM * closeNeighbor_thr;
