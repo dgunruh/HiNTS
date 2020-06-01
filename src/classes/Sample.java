@@ -227,7 +227,7 @@ public class Sample {
     	nextn_n_dist_thr = Configuration.nextn_n_distThr*Constants.nmtobohr;
     	neck_dist_thr = Configuration.neckDistThr*Constants.nmtobohr;
     	liganddc = Configuration.ligandDC;
-    	npdc = Configuration.npDC;
+    	npdc = Configuration.npDC + (temperature*Constants.ry_to_kelvin - 300.0)*Configuration.epsilon_per_K;
     	nbnd = Configuration.nBands;
     	e_degeneracy = Configuration.e_degeneracy;
     	h_degeneracy = Configuration.h_degeneracy;

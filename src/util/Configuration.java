@@ -8,7 +8,7 @@ public class Configuration {
 	public static final int STEPS = 250000; //total number of steps
 	public static final int MIN_THRESH_STEPS = 100000; //number of steps before values are recorded
 	public static final double ligandDC = 2.0; // ligand dc. EDT: 2.0. Alumina: 9.0. Used 9.0 for Moule
-	public static final double npDC = 22.0; //bulk dielectric constant
+	public static final double npDC = 22.0; //bulk dielectric constant. 22.9 more accurate. If T dependent, bulk@300K.
 	public static final double ligandLength = 0.50 ; // in nm, was 0.2 for Moule project //was 0.45 for tridens
 	public static final double emass = 0.05/2.0; //effective mass for electrons 
 	public static final double hmass = 0.05/2.0; //effective mass for holes 
@@ -55,6 +55,7 @@ public class Configuration {
 	public static final String diameter = "3.0nm/";
 	public static final int e_degeneracy = 8;
 	public static final int h_degeneracy = 8;
+	public static final double epsilon_per_K = -.01; //change in dielectric constant per K
 	
 	// Boolean control
 	public static final boolean twoLayer = false;
