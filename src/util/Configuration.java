@@ -14,7 +14,7 @@ public class Configuration {
 	public static final double hmass = 0.05/2.0; //effective mass for holes 
 	public static final String hoppingMechanism = "ma"; // 'ma' : miller-abrahams, 'marcus' : marcus
 	public static final String capacitanceModel = "delerue"; //"delerue" or "zunger"
-	public static final String effectiveMedium = "mg"; //"mg" or "shklovskii"
+	public static final String effectiveMedium = "shklovskii local"; //"mg" or "shklovskii global" or "shklovskii local"
 	public static final String poissonSolver = "none";
 	public static final int[] rngSeed = new int[]{1,2,3,4};
 	
@@ -27,6 +27,7 @@ public class Configuration {
 	public static final double latticeAngleBeta = 90.0*Math.PI/180.0; //lattice basis angle in radians //95 for Moule //99 for tridens
 	public static final String latticeStructure = "cubic"; //"triclinic" or "cubic" or "Moule". Was triclinic for Moule project
 	public static final double latticeBasisLength = 7.5; //in nm
+	public static final String transportDirection = "z"; //"x", "y", or "z"
 	
 	//Necking NOT USED CURRENTLY
 	public static final double neckRadiusMean = 3.0; //in nm
@@ -38,7 +39,8 @@ public class Configuration {
 	public static final double edgeDistThr = 3.5; //in nm
 		
 	// NP
-	public static final double distThr = 3.0; //in nm, for cubic
+	public static final double near_n_distThr = 3.0; //in nm, for cubic
+	public static final double nextn_n_distThr = 5.0; //in nm, for cubic
 	//public static final double distThr = 4.5; //in nm, for triclinic
 	//public static final double distThr = 1.27;
 	//public static final double distThr = 3.2;

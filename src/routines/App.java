@@ -21,6 +21,7 @@ import util.Utility;
 class Processor implements Callable<Double[]> {
 	private int id;
 	private int order_id;
+	private boolean reverse_the_sample;
 	private double temp;
 	private int nelec;
 	private double screeningFactor;
@@ -32,9 +33,10 @@ class Processor implements Callable<Double[]> {
 	
 	//here we allow different calls by overloading the constructor
 	//base processor
-	public Processor(String folderName, int id, double temp, int nelec, double screeningFactor, boolean randomSeed, boolean necking){
+	public Processor(String folderName, int id, boolean rSample, double temp, int nelec, double screeningFactor, boolean randomSeed, boolean necking){
 		this.id = id;
 		this.order_id = id;
+		this.reverse_the_sample = rSample;
 		this.temp = temp;
 		this.nelec = nelec;
 		this.screeningFactor = screeningFactor;
@@ -44,9 +46,10 @@ class Processor implements Callable<Double[]> {
 	}
 	
 	//voltage processor
-	public Processor(String folderName, int id, double temp, int nelec, double screeningFactor, boolean randomSeed, boolean necking, double voltageRatio){
+	public Processor(String folderName, int id, boolean rSample, double temp, int nelec, double screeningFactor, boolean randomSeed, boolean necking, double voltageRatio){
 		this.id = id;
 		this.order_id = id;
+		this.reverse_the_sample = rSample;
 		this.temp = temp;
 		this.nelec = nelec;
 		this.screeningFactor = screeningFactor;
@@ -58,9 +61,10 @@ class Processor implements Callable<Double[]> {
 	}
 	
 	//repeat sample simulations processor
-	public Processor(String folderName, int id, int order_id, double temp, int nelec, double screeningFactor, boolean randomSeed, boolean necking){
+	public Processor(String folderName, int id, int order_id, boolean rSample, double temp, int nelec, double screeningFactor, boolean randomSeed, boolean necking){
 		this.id = id;
 		this.order_id = order_id; //this is the unique feature
+		this.reverse_the_sample = rSample;
 		this.temp = temp;
 		this.nelec = nelec;
 		this.screeningFactor = screeningFactor;
@@ -83,6 +87,7 @@ class Processor implements Callable<Double[]> {
 		params.put("expected_nnanops", 800); //was 1200
 		params.put("folderName", folderName);
 		params.put("sample_no", id);
+		params.put("reverse_the_sample", reverse_the_sample);
 		params.put("feature", "mobility");
 		params.put("voltage_ratio", voltageRatio);
 		params.put("temperature", temp);
@@ -118,6 +123,7 @@ public class App {
 		double T = 100.0;
 		boolean randomSeed = false; //whether our MersenneTwisterFast will always use the same seeds, or random seeds
 		boolean necking = false; //whether the simulation samples will have necking or not
+		boolean preFlippedSamples = true;
 		
 		//These are the various types of runs that can be conducted
 		boolean multipleDiameters = false; //cycle through batches of NPs at different diameters
@@ -147,7 +153,13 @@ public class App {
 					
 					String folderName = numberOfNanoparticles +"_"+diam + "nm";
 					for(int i=0; i<numberOfSamples; i++){
-						futures.add(executor.submit(new Processor(folderName, i,T,nelec,screeningFactor, randomSeed, necking)));
+						if(preFlippedSamples || (!preFlippedSamples && i%2==0)) {
+							futures.add(executor.submit(new Processor(folderName, i,false, T,nelec,screeningFactor, randomSeed, necking)));
+						}
+						else {
+							futures.add(executor.submit(new Processor(folderName, i,true, T,nelec,screeningFactor, randomSeed, necking)));
+						}
+						
 					}
 		
 					// Stop accepting new tasks. Wait for all threads to terminate.
@@ -220,7 +232,12 @@ public class App {
 	
 				String folderName = numberOfNanoparticles +"_"+diam + "nm";
 				for(int i=0; i<numberOfSamples; i++){
-					futures.add(executor.submit(new Processor(folderName, i,T,nelec,screeningFactor, randomSeed, necking)));
+					if(preFlippedSamples || (!preFlippedSamples && i%2==0)) {
+						futures.add(executor.submit(new Processor(folderName, i,false,T,nelec,screeningFactor, randomSeed, necking)));
+					}
+					else {
+						futures.add(executor.submit(new Processor(folderName, i,true,T,nelec,screeningFactor, randomSeed, necking)));
+					}
 				}
 	
 				// Stop accepting new tasks. Wait for all threads to terminate.
@@ -287,7 +304,12 @@ public class App {
 		
 					String folderName = numberOfNanoparticles +"_"+diam + "nm_200N_" + disorder;
 					for(int i=0; i<numberOfSamples; i++){
-						futures.add(executor.submit(new Processor(folderName, i,temp,nelec,screeningFactor, randomSeed, necking)));
+						if(preFlippedSamples || (!preFlippedSamples && i%2==0)) {
+							futures.add(executor.submit(new Processor(folderName, i,false,temp,nelec,screeningFactor, randomSeed, necking)));
+						}
+						else {
+							futures.add(executor.submit(new Processor(folderName, i,true,temp,nelec,screeningFactor, randomSeed, necking)));
+						}
 					}
 		
 					// Stop accepting new tasks. Wait for all threads to terminate.
@@ -364,7 +386,12 @@ public class App {
 	
 				String folderName = numberOfNanoparticles +"_"+diam + "nm";
 				for(int i=0; i<numberOfSamples; i++){
-					futures.add(executor.submit(new Processor(folderName, i,T,nelec,screeningFactor, randomSeed, necking, voltageRatio)));
+					if(preFlippedSamples || (!preFlippedSamples && i%2==0)) {
+						futures.add(executor.submit(new Processor(folderName, i,false,T,nelec,screeningFactor, randomSeed, necking, voltageRatio)));
+					}
+					else {
+						futures.add(executor.submit(new Processor(folderName, i,true,T,nelec,screeningFactor, randomSeed, necking, voltageRatio)));
+					}
 				}
 	
 				// Stop accepting new tasks. Wait for all threads to terminate.
@@ -431,8 +458,15 @@ public class App {
 					for(int j=0; j<repetitions; j++) {
 						int nonflippedID = i*repetitions + 2*j;
 						int flippedID = i*repetitions + 2*j + 1;
-						futures.add(executor.submit(new Processor(folderName, i,nonflippedID, T,nelec,screeningFactor, randomSeed, necking)));
-						futures.add(executor.submit(new Processor(folderName, i+1,flippedID, T,nelec, screeningFactor, randomSeed, necking)));
+						
+						if(preFlippedSamples) {
+							futures.add(executor.submit(new Processor(folderName, i,nonflippedID, false, T,nelec,screeningFactor, randomSeed, necking)));
+							futures.add(executor.submit(new Processor(folderName, i+1,flippedID, false, T,nelec, screeningFactor, randomSeed, necking)));
+						}
+						else {
+							futures.add(executor.submit(new Processor(folderName, i,nonflippedID, false, T,nelec,screeningFactor, randomSeed, necking)));
+							futures.add(executor.submit(new Processor(folderName, i+1,flippedID, true, T,nelec, screeningFactor, randomSeed, necking)));
+						}
 					}
 				}
 	
@@ -527,7 +561,12 @@ public class App {
 
 			String folderName = numberOfNanoparticles +"_"+diam + "nm";
 			for(int i=0; i<numberOfSamples; i++){
-				futures.add(executor.submit(new Processor(folderName, i + sampleStart,i, T,nelec, screeningFactor, randomSeed, necking)));
+				if(preFlippedSamples || (!preFlippedSamples && i%2==0)) {
+					futures.add(executor.submit(new Processor(folderName, i + sampleStart,i, false, T,nelec, screeningFactor, randomSeed, necking)));
+				}
+				else {
+					futures.add(executor.submit(new Processor(folderName, i + sampleStart,i, true, T,nelec, screeningFactor, randomSeed, necking)));
+				}
 			}
 
 			// Stop accepting new tasks. Wait for all threads to terminate.

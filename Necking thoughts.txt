@@ -1,0 +1,29 @@
+1. (CHECK) Introduce enhanced effective medium approximation to account for necked structures
+	- Bruggeman/ Shklovskii approximation, and do it NP by NP
+	- effective medium approximation for the entire sample, independent of local sample
+	- Look at small regions surrounding each NP. More difficult but potentially more accurate.
+		Would allow for differences between fully necked NPs and fully isolated ones. 
+2. Develop better approximation for the orbital hybridization term.
+	- Basic approximation is that E_hybrid = h*Gamma (where Gamma is the tunneling rate)
+	- More advanced determination should involve the wavefunction overlap integral I
+3. Once metallic transport is enabled, electron transport can happen via clusters of metallically fused NPs. 
+	- Caveat is that we already determined transport rate via necks. 
+	- Look into bandlike transport: determine k, and then transport occurs via applied electric field ala ensemble monte carlo
+	- Could have small clusters of mini-bands, broken up by extended states
+
+4. Better NP samples need to be created
+	- Targets of interest: impact of necking width distribution, impact of neck number distribution
+	- Impacts of NP size distribution and filling on these numbers as well
+	- Do a 4 layer system
+	- Neck across the sample edges
+	- Have a mixture of NPs that are necked but don't "overlap," and overlapped NPs where the overlap
+		radius determines the neck width
+	- Add term which pulls NPs together if they are necked (weakly though)
+
+5. Look at coherence of electron transport. Hopping destroys coherence, tunneling through necks maintains it (if fermi golden rule)
+	- Examine phase twisting: start with electrons of different phases on either side, do the phases mix
+	- Phase evolves as e^(ikx) where k = sqrt(2m*E)/hbar
+	- Decoherent transport: electrons lose phase information
+
+FAFSA
+Read Electronic transport in mesoscopic systems

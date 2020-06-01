@@ -193,16 +193,16 @@ public class Electron extends Charge {
 	    // for the electron before hopping this comes with negative sign as this is subtracted
 		for(Nanoparticle sourceNeighbor: sourceNP.nearestNeighbors){
 			ccdistance = sourceNP.centerDistanceMap.get(sourceNeighbor);
-			nnPoisson += -Constants.e2*(sourceNeighbor.occupationTotalElectron-sourceNeighbor.occupationTotalHoles) / sample.dcout / ccdistance;
+			nnPoisson += -Constants.e2*(sourceNeighbor.occupationTotalElectron-sourceNeighbor.occupationTotalHoles) / sourceNeighbor.dcout / ccdistance;
 		}
 		// for the electron after hopping
 		for(Nanoparticle targetNeighbor: targetNP.nearestNeighbors){
 			ccdistance = targetNP.centerDistanceMap.get(targetNeighbor);
 			
 			if(targetNeighbor==sourceNP)
-				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron - targetNeighbor.occupationTotalHoles -1) / sample.dcout / ccdistance;	
+				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron - targetNeighbor.occupationTotalHoles -1) / targetNeighbor.dcout / ccdistance;	
 			else
-				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron- targetNeighbor.occupationTotalHoles) / sample.dcout / ccdistance;
+				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron- targetNeighbor.occupationTotalHoles) / targetNeighbor.dcout / ccdistance;
 		}
 		return nnPoisson;
 	}
@@ -233,8 +233,19 @@ public class Electron extends Charge {
     	if(calculateExciton(targetNP, sourceNP, sample) != 0.0) System.out.println("exciton was used");
     	
     	// External potential
-        energy_diff += charge*(sample.voltage/sample.cellz)*(targetNP.z-sourceNP.z-sample.cellz*Math.round((targetNP.z-sourceNP.z)/sample.cellz));
-
+    	switch(Configuration.transportDirection) {
+    		case "z":
+    			energy_diff += charge*(sample.voltage/sample.cellz)*(targetNP.z-sourceNP.z-sample.cellz*Math.round((targetNP.z-sourceNP.z)/sample.cellz));
+    			break;
+    		case "x":
+    			energy_diff += charge*(sample.voltage/sample.cellx)*(targetNP.x-sourceNP.x-sample.cellx*Math.round((targetNP.x-sourceNP.x)/sample.cellx));
+    			break;
+    			
+    		case "y":
+    			energy_diff += charge*(sample.voltage/sample.celly)*(targetNP.y-sourceNP.y-sample.celly*Math.round((targetNP.y-sourceNP.y)/sample.celly));
+    			break;
+    	
+    	}
         //System.out.println("Energy diff is: " + energy_diff*Constants.rytoev);
         
     	// Nearest neighbor interaction

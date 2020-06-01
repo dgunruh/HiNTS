@@ -41,7 +41,7 @@ public class Sample {
     double chemicalPotential = 0, V_prime;  // used for grand canonical ensemble
 
     public double temperature, voltage ;  
-    public double ndist_thr, neck_dist_thr, ediff_thr, ediff_neck_thr, dcout, beta, packingfraction;
+    public double near_n_dist_thr, nextn_n_dist_thr, neck_dist_thr, ediff_thr, ediff_neck_thr, beta, packingfraction;
     double ediff_hopping_thr; //for the overlap energy for different disorder values
     public int e_degeneracy, h_degeneracy, nbnd;
     public double cellx, celly, cellz, cellz_nm;
@@ -62,6 +62,7 @@ public class Sample {
     public double screeningFactor; //how much to reduce charging energy by, if necessary
     public boolean randomSeed; //do we use a random seed for MersenneTwisterFast, or preset seed
     public boolean necking; //are the nanoparticles necked together
+    public boolean reverse_the_sample; //should the sample characteristic be flipped around. Unnecessary if the sample was "pre-flipped" or if the sample is unflipped regardless
   
     double npdc, liganddc, metalPrefactor, FWHM;
     double average_spacing = 2*Configuration.ligandLength*Constants.nmtobohr;
@@ -96,6 +97,7 @@ public class Sample {
     	expected_nnanops = (int) params.get("expected_nnanops");
     	nnanops = expected_nnanops; //default value
     	sample_number = (int) params.get("sample_no");
+    	reverse_the_sample = (boolean) params.get("reverse_the_sample");
     	feature = (String) params.get("feature");
     	temperature = (double) params.get("temperature") * Constants.kelvintory;
     	closeNeighbor_thr = (double) params.get("closeNeighbor_thr");
@@ -106,9 +108,14 @@ public class Sample {
     	folderName = (String) params.get("folderName");
     	
     	if(feature=="mobility"){
+    		if(!reverse_the_sample) {
+    			voltage = 5*30*Constants.kelvintory*0.1*20 / Constants.sqrt2; //Multiplied by 8. This was for the moule samples
+    			System.out.println("Mobility run, voltage is "+voltage*Constants.rytoev);
+    		}
+    		else {
+    			voltage = -5*30*Constants.kelvintory*0.1*20 / Constants.sqrt2;
+    		}
     		//voltage = 0.5*30*Constants.kelvintory*0.1*25 / Constants.sqrt2; //25 nanoparticles, so each get this 30K voltage
-    		voltage = 5*30*Constants.kelvintory*0.1*20 / Constants.sqrt2; //Multiplied by 8. This was for the moule samples
-    		System.out.println("Mobility run, voltage is "+voltage*Constants.rytoev);
     	}
     	if(feature=="iv")
     		voltage = 30*Constants.kelvintory*((double)params.get("voltage_ratio"))*.1*20/Constants.sqrt2;
@@ -138,24 +145,26 @@ public class Sample {
         ediff_thr = FWHM * closeNeighbor_thr;
         ediff_neck_thr = FWHM * neckedNeighbor_thr;
         
-        ediff_hopping_thr = .014*Constants.evtory; //an overlap energy of 5 meV
+        ediff_hopping_thr = .014*Constants.evtory; //an overlap energy of 14 meV
         if(necking) get_necked_neighbors();
         //get_necked_neighbors();
         buildNeighborList(false, true);
-        dielectrics();
+        dielectrics(true);
         set_selfenergy();
         
         // throw electrons on to nanoparticles
-//        for(int i=0; i<nelec; i++)
-//        	throw_electron();
-        for(Nanoparticle np: nanoparticles) {
-        	Electron e = new Electron();
-        	e.setHost(np, 0);
-        	np.add_electron(e, 0);
-        	double[] destination = {np.x, np.z};
-        	e.visitedNPs.add(destination);
-        }
-        for(int i = 0; i < nelec%800; i++) throw_electron();
+        for(int i=0; i<nelec; i++)
+        	throw_electron();
+        
+        //This method fills every NP, then adds on to the even landscape randomly
+//        for(Nanoparticle np: nanoparticles) {
+//        	Electron e = new Electron();
+//        	e.setHost(np, 0);
+//        	np.add_electron(e, 0);
+//        	double[] destination = {np.x, np.z};
+//        	e.visitedNPs.add(destination);
+//        }
+//        for(int i = 0; i < nelec%800; i++) throw_electron();
  
         //throw holes on to nanoparticles
         for(int i=0; i < nhole; i++)
@@ -186,11 +195,11 @@ public class Sample {
     	
     	for(Nanoparticle NP: nanoparticles) {
     		double z = NP.z, radius = NP.radius;
-    		if(z-radius <= (tempMin + ndist_thr)){
+    		if(z-radius <= (tempMin + near_n_dist_thr)){
 				NP.source = true;
 				sources.add(NP);
 			}
-			if(z+radius >= (tempMax - ndist_thr)){
+			if(z+radius >= (tempMax - near_n_dist_thr)){
 				NP.drain = true;
 				drains.add(NP);
 			}
@@ -214,7 +223,8 @@ public class Sample {
     	hmass = Configuration.hmass;
     	ligandlength = Configuration.ligandLength*Constants.nmtobohr;
     	capacitance = Configuration.capacitance*2.0/Constants.evtory; // used for zunger
-    	ndist_thr = Configuration.distThr*Constants.nmtobohr;
+    	near_n_dist_thr = Configuration.near_n_distThr*Constants.nmtobohr;
+    	nextn_n_dist_thr = Configuration.nextn_n_distThr*Constants.nmtobohr;
     	neck_dist_thr = Configuration.neckDistThr*Constants.nmtobohr;
     	liganddc = Configuration.ligandDC;
     	npdc = Configuration.npDC;
@@ -355,10 +365,10 @@ public class Sample {
 		
 	}
 
-    private void dielectrics() {
+    private void dielectrics(boolean connected_z) {
 		
+    	//Determine packing fraction and average NP diameter
     	double npVolume = 0;
-    	// set dcin for each nanoparticle
     	double average_diameter = 0;
     	for(int i=0; i<nanoparticles.length; i++){
     		npVolume += 4.0/3.0*Constants.pi*Math.pow(nanoparticles[i].radius, 3);
@@ -369,32 +379,76 @@ public class Sample {
     			nanoparticles[i].dcin = npdc;
     	}
     	average_diameter = average_diameter/nanoparticles.length;
-    	//System.out.println(average_spacing/average_diameter);
-    	
     	packingfraction = npVolume / (cellx*celly*cellz);
-    	// set dcout for the sample
+    	
+    	// set dcout for each NP individually
     	switch (effectiveMedium){
 			case "mg":
-				dcout = liganddc*(npdc*(1+2*packingfraction)-liganddc*(2*packingfraction-2))/(liganddc*(2+packingfraction)+npdc*(1-packingfraction));
+				for(int i=0; i<nanoparticles.length; i++) {
+					nanoparticles[i].dcout = liganddc*(nanoparticles[i].dcin*(1+2*packingfraction)-liganddc*(2*packingfraction-2))/(liganddc*(2+packingfraction)+nanoparticles[i].dcin*(1-packingfraction));
+				}
+				//dcout = liganddc*(npdc*(1+2*packingfraction)-liganddc*(2*packingfraction-2))/(liganddc*(2+packingfraction)+npdc*(1-packingfraction));
 				//dcout = sample.liganddc*(sample.npdc*(1+2*packingfraction)-sample.liganddc*(2*packingfraction-2))/(sample.liganddc*(2+packingfraction)+sample.npdc*(1-packingfraction))
-				//System.out.println("running mg");
-				
-				//System.out.println("Maxwell-Garnett: " + dcout);
-				//System.out.println("Skhlovskii-Interpolation: " + shlkovskii_dc);
-			break;
+				break;
 			
-			case "shklovskii":
+			case "shklovskii global":
 				double delta = average_diameter*Math.pow(Math.PI,6.0/5.0)/Math.pow(2, 11.0/5.0)*Math.pow(liganddc/npdc,6.0/5.0);
 				if(average_spacing >=0) {
-					dcout = Math.PI/2*liganddc*Math.pow(average_diameter/(2*average_spacing + 2*delta), 1.0/3.0);
+					for(int i=0; i<nanoparticles.length; i++) {
+						nanoparticles[i].dcout = Math.PI/2*liganddc*Math.pow(average_diameter/(2*average_spacing + 2*delta), 1.0/3.0);
+					}
 				}
 				else {
-					dcout = npdc*Math.sqrt(2*(Math.abs(average_spacing)+delta)/average_diameter);
+					for(int i=0; i<nanoparticles.length; i++) {
+						nanoparticles[i].dcout = npdc*Math.sqrt(2*(Math.abs(average_spacing)+delta)/average_diameter);
+					}
 				}
+				break;
 
+			case "shklovskii local":
+		    	//Average the inter-NP spacing over next-nearest-neighbors and nearest-neighbors
+		    	for(int i=0; i<nanoparticles.length; i++){
+		        	double totalSpacing = 0.0;
+		        	double totalDiameter = 0.0;
+		        	int totalSpaces = 0;
+		        	int visitedNPs = 0;
+		    		ArrayList<Nanoparticle> visitedNeighbors = new ArrayList<Nanoparticle>();
+					for(int j=0; j<nanoparticles.length; j++){
+						if(i != j){
+							visitedNeighbors.add(nanoparticles[j]);
+							totalDiameter += nanoparticles[j].diameter;
+							visitedNPs += 1;
+							double edgeDist = nanoparticles[i].npnpdistance(nanoparticles[j], this, connected_z, false);
+							if (edgeDist <= nextn_n_dist_thr){
+								for ( Map.Entry<Nanoparticle, Double> entry : nanoparticles[j].edgeDistanceMap.entrySet()) {
+									Nanoparticle neighbor = entry.getKey();
+									Double spacing = entry.getValue();
+									if (!visitedNeighbors.contains(neighbor)) {
+										totalSpacing += spacing;
+										totalSpaces += 1;
+									}
+								}
+							}
+						}
+					}
+					double averageSpacing = totalSpacing/totalSpaces;
+					double averageDiameter = totalDiameter/visitedNPs;
+					double del = averageDiameter*Math.pow(Math.PI,6.0/5.0)/Math.pow(2, 11.0/5.0)*Math.pow(liganddc/nanoparticles[i].dcin,6.0/5.0);
+					if(averageSpacing >=0) {
+						nanoparticles[i].dcout = Math.PI/2*liganddc*Math.pow(averageDiameter/(2*averageSpacing + 2*del), 1.0/3.0);
+					}
+					else {
+						nanoparticles[i].dcout = nanoparticles[i].dcin*Math.sqrt(2*(Math.abs(averageSpacing)+del)/averageDiameter);
+					}
+
+		    	}
+		    	break;
+				
 			default:
-				dcout = liganddc;
-			break;
+				for(int i=0; i<nanoparticles.length; i++) {
+					nanoparticles[i].dcout = liganddc;
+				}
+				break;
 		}	
 	}
 
@@ -405,15 +459,16 @@ public class Sample {
 			switch (capacitanceModel) {
 				case "delerue":
 					//System.out.println(i);
-					nanoparticles[i].selfenergy0 = ((Constants.e2/nanoparticles[i].radius)*((0.5/dcout - 0.5/nanoparticles[i].dcin) + 0.47*(nanoparticles[i].dcin-dcout)/((nanoparticles[i].dcin+dcout)*nanoparticles[i].dcin))); 
+					nanoparticles[i].selfenergy0 = ((Constants.e2/nanoparticles[i].radius)*((0.5/nanoparticles[i].dcout - 0.5/nanoparticles[i].dcin) + 0.47*(nanoparticles[i].dcin-nanoparticles[i].dcout)/((nanoparticles[i].dcin+nanoparticles[i].dcout)*nanoparticles[i].dcin))); 
 					//System.out.println("sigma0 = " + nanoparticles[i].selfenergy0);
-					nanoparticles[i].selfenergy = (Constants.e2/nanoparticles[i].radius*(1.0 / dcout + 0.79 /nanoparticles[i].dcin));
+					nanoparticles[i].selfenergy = (Constants.e2/nanoparticles[i].radius*(1.0 / nanoparticles[i].dcout + 0.79 /nanoparticles[i].dcin));
 					//System.out.println("sigma = " + nanoparticles[i].selfenergy);
 					
 					//make hole energies negative
-					nanoparticles[i].hselfenergy0 = -(Constants.e2/nanoparticles[i].radius*((0.5 /dcout-0.5 /nanoparticles[i].dcin)+0.47 /nanoparticles[i].dcin*(nanoparticles[i].dcin - dcout)/(nanoparticles[i].dcin + dcout)));
-					nanoparticles[i].hselfenergy = -(Constants.e2/nanoparticles[i].radius*(1.0 / dcout + 0.79 /nanoparticles[i].dcin));
-					
+					//nanoparticles[i].hselfenergy0 = -(Constants.e2/nanoparticles[i].radius*((0.5 /nanoparticles[i].dcout-0.5 /nanoparticles[i].dcin)+0.47 /nanoparticles[i].dcin*(nanoparticles[i].dcin - nanoparticles[i].dcout)/(nanoparticles[i].dcin + nanoparticles[i].dcout)));
+					//nanoparticles[i].hselfenergy = -(Constants.e2/nanoparticles[i].radius*(1.0 / nanoparticles[i].dcout + 0.79 /nanoparticles[i].dcin));
+					nanoparticles[i].hselfenergy0 = -nanoparticles[i].selfenergy0;
+					nanoparticles[i].selfenergy = -nanoparticles[i].selfenergy;
 				break;
 				
 
@@ -526,7 +581,7 @@ public class Sample {
 					centerDist = nanoparticles[i].npnpdistance(nanoparticles[j], this, connected_z, true);
 					
 					// Add nearest neighbors
-					if(edgeDist <= ndist_thr){
+					if(edgeDist <= near_n_dist_thr){
 						total_spacing += edgeDist;
 						total_spaces += 1;
 						//if(edgeDist >=0) {
@@ -566,8 +621,8 @@ public class Sample {
 						//nanoparticles[k].neckRadiusMap.put(nanoparticles[i], neckRadius);
 						neckedNeighbors.add(nanoparticles[index]);
 						nearestNeighbors.remove(nanoparticles[index]); //no hopping transport when necks exist
-						nanoparticles[i].edgeDistanceMap.remove(nanoparticles[index]);
-						nanoparticles[i].centerDistanceMap.remove(nanoparticles[index]);
+						//nanoparticles[i].edgeDistanceMap.remove(nanoparticles[index]);
+						//nanoparticles[i].centerDistanceMap.remove(nanoparticles[index]);
 						total_neckedNeighbors += 1;
 					}
 					

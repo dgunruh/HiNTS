@@ -45,7 +45,7 @@ public class Nanoparticle {
 	double[] vbenergy = new double[2];
 	double vbenergy1, vbenergy2;
 	
-	double dcin;
+	double dcin, dcout;
 	
 	double selfenergy0, selfenergy;
 	double hselfenergy0, hselfenergy;
@@ -72,65 +72,128 @@ public class Nanoparticle {
 		set_vbenergy();
 		set_occupation(sample);
 		
-		switch(sample.latticeStructure){
+		//Define whether it is a source or a drain
+		switch(Configuration.transportDirection) {
+		case "z":
+			switch(sample.latticeStructure){
 			case "triclinic":
-				//calculate components of lattice vector a_3
-				double x_3 = Configuration.latticeBasisLength*(Math.cos(sample.latticeAngleBeta)-Math.cos(sample.latticeAngleAlpha)*Math.cos(sample.latticeAngleGamma))/Math.sin(sample.latticeAngleGamma);
-				double z_3,m_edge;
-				
-				if(sample.sample_number%2 == 0) {
-					z_3 = Configuration.latticeBasisLength*Math.cos(sample.latticeAngleAlpha);
-					m_edge = 1/Math.tan(sample.latticeAngleGamma); //equation is z-z0 = m*(x-x0
+				if(!sample.reverse_the_sample) {
+					//The sample does not need to be reversed. It has either been flipped or is in its standard configuration
+					//calculate components of lattice vector a_3
+					double x_3 = Configuration.latticeBasisLength*(Math.cos(sample.latticeAngleBeta)-Math.cos(sample.latticeAngleAlpha)*Math.cos(sample.latticeAngleGamma))/Math.sin(sample.latticeAngleGamma);
+					double z_3,m_edge;
+
+					if(sample.sample_number%2 == 0) {
+						z_3 = Configuration.latticeBasisLength*Math.cos(sample.latticeAngleAlpha);
+						m_edge = 1/Math.tan(sample.latticeAngleGamma); //equation is z-z0 = m*(x-x0
+					}
+					else {
+						z_3 = -Configuration.latticeBasisLength*Math.cos(sample.latticeAngleAlpha);
+						m_edge = -1/Math.tan(sample.latticeAngleGamma); //equation is z-z0 = m*(x-x0
+					}
+
+
+					double y_3 = Math.sqrt(Math.pow(Configuration.latticeBasisLength,2.0)-Math.pow(x_3,2.0)-Math.pow(z_3,2.0));
+					int y_layer = (int) Math.round((y-y0)/(y_3*Constants.nmtobohr));
+					//calculate how the x and z components of the origin of that layer are shifted with respect to the first layer
+					double z_mod = y_layer*z_3*Constants.nmtobohr;
+					double x_mod = y_layer*x_3*Constants.nmtobohr;
+
+					//calculate the left and right electrode locations for the current NP
+					double z_left = m_edge*(x-x_mod - x0) + z_mod + z0 - Configuration.ligandLength*Constants.nmtobohr/2.0;
+					double z_right = sample.cellz + m_edge*(x-x_mod - x0) + z_mod - z0 + Configuration.ligandLength*Constants.nmtobohr/2.0;
+
+					//if the edge of the NP overlaps with the electrode, it is considered to be a source/drain
+					if(z-radius <= (z_left + sample.near_n_dist_thr)){
+						source = true;
+						sample.sources.add(this);
+					}
+					if(z+radius >= (z_right - sample.near_n_dist_thr)){
+						drain = true;
+						sample.drains.add(this);
+					}
 				}
 				else {
-					z_3 = -Configuration.latticeBasisLength*Math.cos(sample.latticeAngleAlpha);
-					m_edge = -1/Math.tan(sample.latticeAngleGamma); //equation is z-z0 = m*(x-x0
+					//Sample is to be flipped internally, so sources and drains are reversed
+					if(z-radius <= sample.near_n_dist_thr){
+						drain = true;
+						sample.drains.add(this);
+					}
+					if(z+radius >= (sample.cellz - sample.near_n_dist_thr)){
+						source = true;
+						sample.sources.add(this);
+					}
 				}
-
-				
-				double y_3 = Math.sqrt(Math.pow(Configuration.latticeBasisLength,2.0)-Math.pow(x_3,2.0)-Math.pow(z_3,2.0));
-				int y_layer = (int) Math.round((y-y0)/(y_3*Constants.nmtobohr));
-				//calculate how the x and z components of the origin of that layer are shifted with respect to the first layer
-				double z_mod = y_layer*z_3*Constants.nmtobohr;
-				double x_mod = y_layer*x_3*Constants.nmtobohr;
-				
-				//calculate the left and right electrode locations for the current NP
-				double z_left = m_edge*(x-x_mod - x0) + z_mod + z0 - Configuration.ligandLength*Constants.nmtobohr/2.0;
-				double z_right = sample.cellz + m_edge*(x-x_mod - x0) + z_mod - z0 + Configuration.ligandLength*Constants.nmtobohr/2.0;
-				
-				//if the edge of the NP overlaps with the electrode, it is considered to be a source/drain
-				if(z-radius <= (z_left + sample.ndist_thr)){
-					source = true;
-					sample.sources.add(this);
-				}
-				if(z+radius >= (z_right - sample.ndist_thr)){
-					drain = true;
-					sample.drains.add(this);
-				}
-			break;
-			
+				break;
 			case "cubic":
-				if(z-radius <= sample.ndist_thr){
+				if(z-radius <= sample.near_n_dist_thr){
 					source = true;
 					sample.sources.add(this);
 				}
-				if(sample.cellz - (z+radius) <= sample.ndist_thr){
+				if(sample.cellz - (z+radius) <= sample.near_n_dist_thr){
 					drain = true;
 					sample.drains.add(this);
 				}
-			break;
-			
+				break;
+
 			case "Moule":
 				double z_left_edge = sample.leftmost_NP_z;
 				double z_right_edge = sample.rightmost_NP_z;
-				if(z-radius <= (z_left_edge + sample.ndist_thr)){
+				if(z-radius <= (z_left_edge + sample.near_n_dist_thr)){
 					source = true;
 					sample.sources.add(this);
 				}
-				if(z+radius >= (z_right_edge - sample.ndist_thr)){
+				if(z+radius >= (z_right_edge - sample.near_n_dist_thr)){
 					drain = true;
 					sample.drains.add(this);
 				}
+				break;
+		}
+		break;
+		case "x":
+			if(!sample.reverse_the_sample) {
+				if(x-radius <= sample.near_n_dist_thr){
+					source = true;
+					sample.sources.add(this);
+				}
+				if(sample.cellx - (x+radius) <= sample.near_n_dist_thr){
+					drain = true;
+					sample.drains.add(this);
+				}
+			}
+			else {
+				if(x-radius <= sample.near_n_dist_thr){
+					drain = true;
+					sample.drains.add(this);
+				}
+				if(sample.cellx - (x+radius) <= sample.near_n_dist_thr){
+					source = true;
+					sample.sources.add(this);
+				}
+			}
+			break;
+
+		case"y":
+			if(!sample.reverse_the_sample) {
+				if(y-radius <= sample.near_n_dist_thr){
+					source = true;
+					sample.sources.add(this);
+				}
+				if(sample.celly - (y+radius) <= sample.near_n_dist_thr){
+					drain = true;
+					sample.drains.add(this);
+				}
+			}
+			else {
+				if(y-radius <= sample.near_n_dist_thr){
+					drain = true;
+					sample.drains.add(this);
+				}
+				if(sample.celly - (y+radius) <= sample.near_n_dist_thr){
+					source = true;
+					sample.sources.add(this);
+				}
+			}
 			break;
 		}
 		
@@ -370,7 +433,7 @@ public class Nanoparticle {
 		//See Delerue pg. 111-112
 		double C_coul = 1.786; //for approximately spherical nanoparticles
 		double U_direct = C_coul*2*Constants.e2/(dcin*diameter); //direct electron-hole interaction
-		double U_image = 2*Constants.e2*(dcin - sample.dcout)/(diameter*dcin*sample.dcout);
+		double U_image = 2*Constants.e2*(dcin - dcout)/(diameter*dcin*dcout);
 		double U_exciton = U_direct + U_image;//note: this will be made negative if electrons, and kept positive if holes
 		
 		return eOccupation * hOccupation * U_exciton; //each majority carrier will have interactions with each minority carrier
