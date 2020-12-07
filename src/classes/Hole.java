@@ -13,7 +13,8 @@ public class Hole extends Charge {
 	}
 
 
-
+	//This method tabulates all possible transport events that the hole can execute. These include:
+	//cluster hoppings, miller-abrahams transitions, metallic transitions, and necked transitions.
 	public double lookForEvents(Sample sample) {
 		//System.out.println(this.hostNP);
 		double degeneracy;
@@ -176,7 +177,7 @@ public class Hole extends Charge {
 	    // for the electron before hopping this comes with negative sign as this is subtracted
 		for(Nanoparticle sourceNeighbor: sourceNP.nearestNeighbors){
 			ccdistance = sourceNP.centerDistanceMap.get(sourceNeighbor);
-			nnPoisson += -Constants.e2*(sourceNeighbor.occupationTotalElectron-sourceNeighbor.occupationTotalHoles) / sample.dcout / ccdistance;
+			nnPoisson += -Constants.e2*(sourceNeighbor.occupationTotalElectron-sourceNeighbor.occupationTotalHoles) / sourceNeighbor.dcout / ccdistance;
 		}
 		// for the electron after hopping
 		// CAUTION! here should be for the hole after the hopping !!
@@ -184,9 +185,9 @@ public class Hole extends Charge {
 			ccdistance = targetNP.centerDistanceMap.get(targetNeighbor);
 			
 			if(targetNeighbor==sourceNP)
-				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron - targetNeighbor.occupationTotalHoles -1) / sample.dcout / ccdistance;	
+				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron - targetNeighbor.occupationTotalHoles -1) / targetNeighbor.dcout / ccdistance;	
 			else
-				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron- targetNeighbor.occupationTotalHoles) / sample.dcout / ccdistance;
+				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron- targetNeighbor.occupationTotalHoles) / targetNeighbor.dcout / ccdistance;
 		}
 		return nnPoisson;
 	}

@@ -109,11 +109,13 @@ public class Sample {
     	
     	if(feature=="mobility"){
     		if(!reverse_the_sample) {
-    			voltage = 5*30*Constants.kelvintory*0.1*20 / Constants.sqrt2; //Multiplied by 8. This was for the moule samples
+    			//voltage = 5*30*Constants.kelvintory*0.1*20 / Constants.sqrt2; //Multiplied by 8. This was for the moule samples
+    			voltage = 5*30*Constants.kelvintory*0.1*20 / Constants.sqrt2;
     			System.out.println("Mobility run, voltage is "+voltage*Constants.rytoev);
     		}
     		else {
     			voltage = -5*30*Constants.kelvintory*0.1*20 / Constants.sqrt2;
+    			System.out.println("Negative voltage");
     		}
     		//voltage = 0.5*30*Constants.kelvintory*0.1*25 / Constants.sqrt2; //25 nanoparticles, so each get this 30K voltage
     	}
@@ -143,9 +145,10 @@ public class Sample {
         System.out.println("FWHM is: " + FWHM*Constants.rytoev);
 		//FWHM = 0.1;
         ediff_thr = FWHM * closeNeighbor_thr;
-        ediff_neck_thr = FWHM * neckedNeighbor_thr;
-        
-        ediff_hopping_thr = .014*Constants.evtory; //an overlap energy of 14 meV
+        //ediff_neck_thr = FWHM * neckedNeighbor_thr;
+        ediff_neck_thr = .014 * Constants.evtory;
+        //ediff_hopping_thr = .014*Constants.evtory; //an overlap energy of 14 meV
+        ediff_hopping_thr = .014*Constants.evtory;
         if(necking) get_necked_neighbors();
         //get_necked_neighbors();
         buildNeighborList(false, true);
@@ -261,9 +264,14 @@ public class Sample {
     	twolayer = Configuration.twoLayer;
     	
     	if(!bimodal){
-    		String prefix = "./data/";
+    		//String prefix = "c:/Users/Davis/Research/Superlattice Project/npSolids/";
+    		String prefix = "c:/Users/Davis/GitHub/HiNTS/data/nanoparticles_cubicSL_PaperSamples_percent/";
     		String middle = folderName; //_.03D"; // looking at grain boundaries
     		String end = "/nanoparticles" + sample_number + ".inp";
+    		if(necking) {
+    			end = "/npSample" + sample_number + ".inp";
+    		}
+    		//String end = "/npSample" + sample_number + ".inp";
     		
     		/* Moule project
     		String prefix= "./data/14x14x6/";
@@ -299,8 +307,11 @@ public class Sample {
     	   {
     	      // Loop just in case the file is > Long.MAX_VALUE or skip() decides to not read the entire file
     	   }
-
+    	   
     	   nnanops = count.getLineNumber() - 6; // +1 because line index starts at 0, -6 for starting lines, -1 because ends in empty line
+    	   if(necking) {
+    		   nnanops -= 1;
+    	   }
     	} catch (FileNotFoundException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
@@ -387,6 +398,7 @@ public class Sample {
 				for(int i=0; i<nanoparticles.length; i++) {
 					nanoparticles[i].dcout = liganddc*(nanoparticles[i].dcin*(1+2*packingfraction)-liganddc*(2*packingfraction-2))/(liganddc*(2+packingfraction)+nanoparticles[i].dcin*(1-packingfraction));
 				}
+				
 				//dcout = liganddc*(npdc*(1+2*packingfraction)-liganddc*(2*packingfraction-2))/(liganddc*(2+packingfraction)+npdc*(1-packingfraction));
 				//dcout = sample.liganddc*(sample.npdc*(1+2*packingfraction)-sample.liganddc*(2*packingfraction-2))/(sample.liganddc*(2+packingfraction)+sample.npdc*(1-packingfraction))
 				break;
@@ -407,30 +419,88 @@ public class Sample {
 
 			case "shklovskii local":
 		    	//Average the inter-NP spacing over next-nearest-neighbors and nearest-neighbors
+				//This works for non-necked NPs, or necked NPs where the overlap is equal to the neck diameter
 		    	for(int i=0; i<nanoparticles.length; i++){
 		        	double totalSpacing = 0.0;
 		        	double totalDiameter = 0.0;
 		        	int totalSpaces = 0;
 		        	int visitedNPs = 0;
 		    		ArrayList<Nanoparticle> visitedNeighbors = new ArrayList<Nanoparticle>();
-					for(int j=0; j<nanoparticles.length; j++){
-						if(i != j){
-							visitedNeighbors.add(nanoparticles[j]);
-							totalDiameter += nanoparticles[j].diameter;
-							visitedNPs += 1;
-							double edgeDist = nanoparticles[i].npnpdistance(nanoparticles[j], this, connected_z, false);
-							if (edgeDist <= nextn_n_dist_thr){
-								for ( Map.Entry<Nanoparticle, Double> entry : nanoparticles[j].edgeDistanceMap.entrySet()) {
-									Nanoparticle neighbor = entry.getKey();
-									Double spacing = entry.getValue();
-									if (!visitedNeighbors.contains(neighbor)) {
-										totalSpacing += spacing;
-										totalSpaces += 1;
-									}
+		    		double totalVolume = 4.0/3.0*Constants.pi*Math.pow(nanoparticles[i].radius, 3);
+		    		
+		    		for(Nanoparticle neighborNP : nanoparticles[i].nextNearestNeighbors) {
+		    			visitedNeighbors.add(neighborNP);
+		    			totalDiameter += neighborNP.diameter;
+		    			visitedNPs += 1;
+		    			
+		    			//calculate average spacing directly
+		    			if(!necking) {
+			    			for ( Map.Entry<Nanoparticle, Double> entry : neighborNP.edgeDistanceMap.entrySet()) {
+								Nanoparticle neighbor = entry.getKey();
+								Double spacing = entry.getValue();
+								if (!visitedNeighbors.contains(neighbor)) {
+									totalSpacing += spacing;
+									totalSpaces += 1;
 								}
 							}
-						}
-					}
+		    			}
+		    			
+		    			//calculate average spacing from neck widths (assume two overlapping spheres)
+		    			boolean simplify = true;
+		    			if(necking && simplify) {
+		    				for(Nanoparticle newNeighborNP : neighborNP.nearestNeighbors) {
+		    					if(!visitedNeighbors.contains(newNeighborNP)) {
+		    						//Check if there is a neck
+		    						//If neck, then calculate artificial spacing
+		    						if(neighborNP.neckRadiusMap.containsKey(newNeighborNP)) {
+		    							double w = neighborNP.neckRadiusMap.get(newNeighborNP);
+		    							double R = neighborNP.radius;
+		    							double r = newNeighborNP.radius;
+		    							double spacing = Math.sqrt(Math.pow(R, 2.0) - Math.pow(w, 2.0)) 
+		    									+ Math.sqrt(Math.pow(R, 2.0) + Math.pow(r, 2.0) - 2*Math.pow(w, 2.0));
+		    							totalSpacing += spacing;
+		    							totalSpaces += 1;
+		    						}
+		    						//If no neck, then use actual spacing
+		    						else {
+		    							double spacing = neighborNP.edgeDistanceMap.get(newNeighborNP);
+		    							totalSpacing += spacing;
+		    							totalSpaces += 1;
+		    						}
+		    					}
+		    				}
+		    			}
+		    			
+		    			//calculate filling fraction, which can then be translated to an average spacing number
+		    			else if(necking && !simplify) {
+		    				totalVolume += 4.0/3.0*Constants.pi*Math.pow(neighborNP.radius, 3);
+		    				for(Nanoparticle newNeighborNP : neighborNP.nearestNeighbors) {
+		    					if(!visitedNeighbors.contains(newNeighborNP)) {
+		    						if(neighborNP.neckRadiusMap.containsKey(newNeighborNP)) {
+		    							//get the neck width. Assume this is the correct neck width no matter what the actual
+		    							//NP-NP center-to-center spacing is
+		    							double w = neighborNP.neckRadiusMap.get(newNeighborNP);
+		    							
+		    							//Now, we need the length of the cylinder that we will represent the neck as
+		    							double r_1 = neighborNP.radius;
+		    							double r_2 = newNeighborNP.radius;
+		    							double d_1 = Math.sqrt(Math.pow(r_1, 2.0) - Math.pow(w, 2.0));
+		    							double d_2 = Math.sqrt(Math.pow(r_2, 2.0) - Math.pow(w, 2.0));
+		    							double w_length = neighborNP.centerDistanceMap.get(newNeighborNP) - d_1 - d_2;
+		    							
+		    							//Now we get the volume of the intersecting spherical caps
+		    							double cap_1 = r_1 - d_1;
+		    							double cap_2 = r_2 - d_2;
+		    							double cap_1_V = Constants.pi*Math.pow(cap_1, 2.0)*(3*r_1-cap_1);
+		    							double cap_2_V = Constants.pi*Math.pow(cap_2, 2.0)*(3*r_2-cap_2);
+		    							
+		    							//Finally, get the additional volume that the neck provides
+		    							totalVolume += (Constants.pi*Math.pow(w, 2.0)*w_length - cap_1_V - cap_2_V);
+		    						}
+		    					}
+		    				}
+		    			}
+		    		}
 					double averageSpacing = totalSpacing/totalSpaces;
 					double averageDiameter = totalDiameter/visitedNPs;
 					double del = averageDiameter*Math.pow(Math.PI,6.0/5.0)/Math.pow(2, 11.0/5.0)*Math.pow(liganddc/nanoparticles[i].dcin,6.0/5.0);
@@ -443,14 +513,153 @@ public class Sample {
 
 		    	}
 		    	break;
+		    	
+			case "shklovskii sphere":
+
+		    	//Compute the spatial filling of the local area around each NP.
+		    	//To do this, create a spherical bounding box, and calculate the volume overlap
+		    	//of the NPs and necks with this box. Note: necks are approximated as spheres for simplicity. 
+		    	double f, j, x, s, d;
+		    	for(int i=0; i<nanoparticles.length; i++){
+		    		f = calculate_local_filling_fraction(nanoparticles[i], 2*Configuration.nextn_n_distThr*Constants.nmtobohr);
+		    		//System.out.println("Filling fraction: " + f);
+		    		//Now turn the filling fraction into Shklovskii's s/d ratio
+		    		x = -0.4;
+		    		j = 1.0;
+		    		while (x < 0.4 && !(Math.abs(j) < .0001)) {
+		    			j = -6.2832 + 12*f + 36*f*x + (28.27 + 36*f)*Math.pow(x, 2.0) + (9.4 + 12*f)*Math.pow(x, 3.0);
+		    			x += .00001;
+		    		}
+		    		//System.out.println("s/d ratio: " + x);
+		    		//Two options to from s/d to s and d separately. 1: use NP d. 2: use average NP d in bounding box. Here I use (1)
+		    		s = x*nanoparticles[i].diameter;
+		    		d = nanoparticles[i].diameter;
+		    		delta = d*Math.pow(Math.PI,6.0/5.0)/Math.pow(2, 11.0/5.0)*Math.pow(liganddc/npdc,6.0/5.0);
+					if(s >=0) {
+						nanoparticles[i].dcout = Math.PI/2*liganddc*Math.pow(d/(2*s + 2*delta), 1.0/3.0);
+					}
+					else {
+						nanoparticles[i].dcout = npdc*Math.sqrt(2*(Math.abs(s)+delta)/d);
+					}
+					//System.out.println("Dielectric constant: " + nanoparticles[i].dcout);
+		    	}
+		    	
+		    	break;
 				
 			default:
 				for(int i=0; i<nanoparticles.length; i++) {
 					nanoparticles[i].dcout = liganddc;
 				}
+				System.out.println("Entered default");
 				break;
 		}	
 	}
+    
+    //Calculate volumetric filling fraction of a NP in a spherical bounding box.
+    //Inputs: bounding radius of the spherical box
+    private double calculate_local_filling_fraction(Nanoparticle np, double boundingRadius) {
+    	//We want to add up the entire volume of nanoparticles (and necks if applicable) inside a spherical box
+    	//Using a cuboid as the box is much more difficult, and not necessary!
+    	double totalVolume = 4.0*Constants.pi*Math.pow(np.radius, 3.0)/3.0;
+    	ArrayList<Nanoparticle> visitedNanoparticles = new ArrayList<Nanoparticle>();
+    	for(int i=0; i<nanoparticles.length; i++){
+    		if(nanoparticles[i]!=np) {
+    			visitedNanoparticles.add(nanoparticles[i]);
+    			double r = nanoparticles[i].radius;
+    			double R = boundingRadius;
+    			double d = np.npnpdistance(nanoparticles[i], this, true, true);
+    			if(d == 0) {System.out.println("zero d!");}
+    			double overlapVolume = volumeSphericalOverlap(r, R, d);
+    			totalVolume += overlapVolume;
+    			boolean inside = overlapVolume > 0.0;
+    			//check if it connects to any nanoparticles inside the bounding sphere
+    			if(necking) {
+    				for ( Map.Entry<Nanoparticle, Double> entry : nanoparticles[i].neckRadiusMap.entrySet()) {
+						Nanoparticle neighbor = entry.getKey();
+						if(!visitedNanoparticles.contains(neighbor)) {
+							double neckRadius = entry.getValue();
+							double dneighbor = np.npnpdistance(neighbor, this, true, true);
+							double equivalentRadius = 0.0; //the radius of the "neck sphere"
+							
+							//if NP_i lives inside the bounding sphere, will check neck regardless
+							if (inside || dneighbor - neighbor.radius <= R) {
+								//Get volume of non-overlapping portion of neck
+								double d_1 = Math.sqrt(Math.pow(r, 2.0) - Math.pow(neckRadius, 2.0));
+								double d_2 = Math.sqrt(Math.pow(neighbor.radius, 2.0) - Math.pow(neckRadius, 2.0));
+								double w_length = nanoparticles[i].centerDistanceMap.get(neighbor) - d_1 - d_2;
+								
+								//Now we get the volume of the intersecting spherical caps
+								double cap_1 = r - d_1;
+								double cap_2 = neighbor.radius - d_2;
+								double cap_1_V = Constants.pi*Math.pow(cap_1, 2.0)*(3*r-cap_1);
+								double cap_2_V = Constants.pi*Math.pow(cap_2, 2.0)*(3*neighbor.radius-cap_2);
+								
+								//Finally, get the additional volume that the neck provides
+								double neckVolume = (Constants.pi*Math.pow(neckRadius, 2.0)*w_length - cap_1_V - cap_2_V);
+								equivalentRadius = Math.pow(3.0*neckVolume/(4*Constants.pi), 1.0/3.0);
+								
+							}
+							
+							if (equivalentRadius > 0.0) {
+								//get coordinates for neck center
+								double deltax = neighbor.x - nanoparticles[i].x;
+								if (Math.abs(deltax) > Math.abs(neighbor.x-(nanoparticles[i].x-cellx)))
+									deltax = neighbor.x-(nanoparticles[i].x-cellx);
+								if (Math.abs(deltax) > Math.abs(neighbor.x-(nanoparticles[i].x+cellx)))
+									deltax = neighbor.x-(nanoparticles[i].x+cellx);
+								
+								double deltay = neighbor.y - nanoparticles[i].y;
+								if (Math.abs(deltay) > Math.abs(neighbor.y-(nanoparticles[i].y-celly)))
+									deltay = neighbor.y-(nanoparticles[i].y-celly);
+								if (Math.abs(deltay) > Math.abs(neighbor.y-(nanoparticles[i].y+celly)))
+									deltay = neighbor.y-(nanoparticles[i].y+celly);
+								
+								double deltaz = neighbor.z - nanoparticles[i].z;
+								if (Math.abs(deltaz) > Math.abs(neighbor.z-(nanoparticles[i].z-cellz)))
+									deltaz = neighbor.z-(nanoparticles[i].z-cellz);
+								if (Math.abs(deltaz) > Math.abs(neighbor.z-(nanoparticles[i].z+cellz)))
+									deltaz = neighbor.z-(nanoparticles[i].z+cellz);
+								double[] neckCenter = new double[]{nanoparticles[i].x + deltax/2.0, nanoparticles[i].y + deltay/2.0, nanoparticles[i].z + deltaz/2.0};
+								double neckDistance = np.nppointdistance(neckCenter, this);
+								double neckOverlapVolume = volumeSphericalOverlap(equivalentRadius, r, neckDistance);
+								totalVolume += neckOverlapVolume;
+							}
+						}
+    				}
+    			}
+    		}
+    		
+    	}
+    	
+    	return totalVolume*3.0/(4.0*Constants.pi*Math.pow(boundingRadius, 3.0));
+    }
+    
+    //Inputs: 
+    //r: the radius of the smaller sphere overlapping the bounding box
+    //R: the radius of the larger sphere (the bounding box)
+    //d: the distance between the centers of the two spheres
+    public double volumeSphericalOverlap(double r, double R, double d) {
+    	double volume = 0.0;
+		//check if the nanoparticle lives fully inside bounding sphere
+		if(d + r <= R) {
+			volume = 4.0*Constants.pi*Math.pow(r, 3.0)/3.0;
+		}
+		//check if the nanoparticles lives partially inside the bounding sphere, and center outside sphere
+		else if(d - r <= R && d > R) {
+			double h1 = R - (Math.pow(R, 2.0) - Math.pow(r, 2.0) + Math.pow(d, 2.0))/(2*d);
+			double h2 = (Math.pow(R, 2.0) - Math.pow(r, 2.0) + Math.pow(d, 2.0))/(2*d) - (d-r);
+			volume = Constants.pi*Math.pow(h1, 2.0)*(3*R - h1)/3.0 + Constants.pi*Math.pow(h2, 2.0)*(3*r - h2)/3.0;
+		}
+		//check if the nanoparticle lives partially inside the bounding sphere and center inside sphere
+		else if(d - r <= R && d < R) {
+			double h1 = R - (Math.pow(R, 2.0) - Math.pow(r, 2.0) + Math.pow(d, 2.0))/(2*d);
+			double h2 = r - (Math.pow(R, 2.0) - Math.pow(r, 2.0) - Math.pow(d, 2.0))/(2*d);
+			double volumeOutside = Constants.pi*Math.pow(h2, 2.0)*(3*r - h2)/3.0 - Constants.pi*Math.pow(h1, 2.0)*(3*R - h1)/3.0;
+			volume = 4.0*Constants.pi*Math.pow(r, 3.0)/3.0 - volumeOutside;
+		}
+		
+		return volume;
+    }
 
     //works for one band only
     private void set_selfenergy(){
@@ -462,13 +671,14 @@ public class Sample {
 					nanoparticles[i].selfenergy0 = ((Constants.e2/nanoparticles[i].radius)*((0.5/nanoparticles[i].dcout - 0.5/nanoparticles[i].dcin) + 0.47*(nanoparticles[i].dcin-nanoparticles[i].dcout)/((nanoparticles[i].dcin+nanoparticles[i].dcout)*nanoparticles[i].dcin))); 
 					//System.out.println("sigma0 = " + nanoparticles[i].selfenergy0);
 					nanoparticles[i].selfenergy = (Constants.e2/nanoparticles[i].radius*(1.0 / nanoparticles[i].dcout + 0.79 /nanoparticles[i].dcin));
+					
 					//System.out.println("sigma = " + nanoparticles[i].selfenergy);
 					
 					//make hole energies negative
 					//nanoparticles[i].hselfenergy0 = -(Constants.e2/nanoparticles[i].radius*((0.5 /nanoparticles[i].dcout-0.5 /nanoparticles[i].dcin)+0.47 /nanoparticles[i].dcin*(nanoparticles[i].dcin - nanoparticles[i].dcout)/(nanoparticles[i].dcin + nanoparticles[i].dcout)));
 					//nanoparticles[i].hselfenergy = -(Constants.e2/nanoparticles[i].radius*(1.0 / nanoparticles[i].dcout + 0.79 /nanoparticles[i].dcin));
 					nanoparticles[i].hselfenergy0 = -nanoparticles[i].selfenergy0;
-					nanoparticles[i].selfenergy = -nanoparticles[i].selfenergy;
+					nanoparticles[i].hselfenergy = -nanoparticles[i].selfenergy;
 				break;
 				
 
@@ -485,8 +695,8 @@ public class Sample {
 	}
     
     public void get_necked_neighbors() {
-    	String prefix= "./data/" + folderName;
-		String middle = "neckSample";
+    	String prefix= "c:/Users/Davis/Research/Superlattice Project/neckDistributions/" + folderName;
+		String middle = "/neckSample";
 		String end = String.valueOf(sample_number/2)+ ".inp";
 		
 		if (Configuration.latticeStructure == "Moule") {
@@ -519,9 +729,16 @@ public class Sample {
 					int neighborID = Integer.valueOf(line.get(1));
 					double neck_diameter = Double.valueOf(line.get(3));
 					
-					int neighborList_neighborID = nanoparticle_idList.get(neighborID);
+					int neighborList_neighborID = 1;
+					try {
+						neighborList_neighborID = nanoparticle_idList.get(neighborID);
+					} catch (Exception e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+						System.out.println("Neighbor id: " + neighborID);
+						System.out.println(nanoparticle_idList);
+					}
 					int neighborList_thisID = nanoparticle_idList.get(thisID); 
-					
 					ArrayList<Object> nn_necks = neighborList.get(neighborList_thisID);
 					ArrayList<Object> neighbor_nn_necks = neighborList.get(neighborList_neighborID);
 					
@@ -554,7 +771,7 @@ public class Sample {
     private void buildNeighborList(boolean directionSelection, boolean connected_z) {
     	int totalnn, totalcn, totalhcn, total_neckedNeighbors;
     	double edgeDist, centerDist;
-    	ArrayList<Nanoparticle> nearestNeighbors, closeNeighbors, closeHoleNeighbors, neckedNeighbors;
+    	ArrayList<Nanoparticle> nearestNeighbors, nextNearestNeighbors, closeNeighbors, closeHoleNeighbors, neckedNeighbors;
     	
     	totalcn=0;
     	totalnn=0;
@@ -567,6 +784,7 @@ public class Sample {
 			//total_neckedNeighbors = 0;
 			
 			nearestNeighbors = new ArrayList<Nanoparticle>();
+			nextNearestNeighbors = new ArrayList<Nanoparticle>();
 			closeNeighbors = new ArrayList<Nanoparticle>();
 			closeHoleNeighbors = new ArrayList<Nanoparticle>();
 			neckedNeighbors = new ArrayList<Nanoparticle>();
@@ -578,7 +796,9 @@ public class Sample {
 			for(int j=0; j<nanoparticles.length; j++){
 				if(i != j){
 					edgeDist = nanoparticles[i].npnpdistance(nanoparticles[j], this, connected_z, false);
+					//if(edgeDist <= 0) {System.out.println("zero or negative edgeDist!!: " + edgeDist*Constants.bohrtonm);}
 					centerDist = nanoparticles[i].npnpdistance(nanoparticles[j], this, connected_z, true);
+					//if(centerDist <= 0) {System.out.println("zero or negative centerDist!!");}
 					
 					// Add nearest neighbors
 					if(edgeDist <= near_n_dist_thr){
@@ -589,7 +809,7 @@ public class Sample {
 						nanoparticles[i].centerDistanceMap.put(nanoparticles[j], centerDist);
 						//nanoparticles[i].electronHopMap.put(nanoparticles[j], 0);
 						nearestNeighbors.add(nanoparticles[j]);
-						totalnn += 1;
+						//totalnn += 1;
 						//add electron close neighbors
 						if(Math.abs(nanoparticles[i].cbenergy[0]-nanoparticles[j].cbenergy[0]) < ediff_thr){
 							closeNeighbors.add(nanoparticles[j]);
@@ -602,6 +822,10 @@ public class Sample {
 						}
 						//}
 						
+					}
+					
+					if(edgeDist <= nextn_n_dist_thr) {
+						nextNearestNeighbors.add(nanoparticles[j]);
 					}
 				}
 			}
@@ -621,9 +845,15 @@ public class Sample {
 						//nanoparticles[k].neckRadiusMap.put(nanoparticles[i], neckRadius);
 						neckedNeighbors.add(nanoparticles[index]);
 						nearestNeighbors.remove(nanoparticles[index]); //no hopping transport when necks exist
+						if(!nanoparticles[i].edgeDistanceMap.containsKey(nanoparticles[index])) {
+							nanoparticles[i].edgeDistanceMap.put(nanoparticles[index], nanoparticles[i].npnpdistance(nanoparticles[index], this, connected_z, false));
+						}
+						if(!nanoparticles[i].centerDistanceMap.containsKey(nanoparticles[index])) {
+							nanoparticles[i].centerDistanceMap.put(nanoparticles[index], nanoparticles[i].npnpdistance(nanoparticles[index], this, connected_z, true));
+						}
 						//nanoparticles[i].edgeDistanceMap.remove(nanoparticles[index]);
 						//nanoparticles[i].centerDistanceMap.remove(nanoparticles[index]);
-						total_neckedNeighbors += 1;
+						//total_neckedNeighbors += 1;
 					}
 					
 					//System.out.println("Nanoparticle id is: " + nanoparticles[i].id + " and the number of necked neighbors is: " + thisNeckNeighborList.size()/2);
@@ -655,6 +885,9 @@ public class Sample {
 			nanoparticles[i].nearestNeighbors = new Nanoparticle[nearestNeighbors.size()];
 			nanoparticles[i].nearestNeighbors = nearestNeighbors.toArray(nanoparticles[i].nearestNeighbors);
 			
+			nanoparticles[i].nextNearestNeighbors = new Nanoparticle[nextNearestNeighbors.size()];
+			nanoparticles[i].nextNearestNeighbors = nextNearestNeighbors.toArray(nanoparticles[i].nextNearestNeighbors);
+			
 			nanoparticles[i].closeNeighbors = new Nanoparticle[closeNeighbors.size()];
 			nanoparticles[i].closeNeighbors = closeNeighbors.toArray(nanoparticles[i].closeNeighbors);
 			
@@ -663,6 +896,9 @@ public class Sample {
 			
 			nanoparticles[i].neckedNeighbors = new Nanoparticle[neckedNeighbors.size()];
 			nanoparticles[i].neckedNeighbors = neckedNeighbors.toArray(nanoparticles[i].neckedNeighbors);
+			
+			totalnn += nearestNeighbors.size();
+			total_neckedNeighbors += neckedNeighbors.size();
 
 		}
 		System.out.println("total number of close neighbor is "+totalcn);
@@ -1110,10 +1346,10 @@ public class Sample {
     
     public void writeElectronAverages() {
     	String currentDirectory = System.getProperty("user.dir");
-    	String folder = "TriDENS Results" + "/" + "ElectronAverages" + "/" + "Disorder" + folderName.substring(folderName.length() - 5) + "/" + "T" + Math.round(temperature*Constants.ry_to_kelvin*100.0)/100.0;
-    	File proposedFolder = new File(currentDirectory +"/" + folder);
+    	String folder = "New NP necking project" + "\\" + "ElectronAverages" + "\\" + "Disorder" + folderName.substring(folderName.length() - 5) + "\\" + "T" + Math.round(temperature*Constants.ry_to_kelvin*100.0)/100.0;
+    	File proposedFolder = new File(currentDirectory +"\\" + folder);
     	System.out.println(currentDirectory + "/" + folder);
-    	String title = folder + "/" + "Sample_" + sample_number+".txt";
+    	String title = folder + "\\" + "Sample_" + sample_number+".txt";
     	if(!proposedFolder.exists()) {
     		//System.out.println("Made directory!");
     		boolean madedir = proposedFolder.mkdirs();

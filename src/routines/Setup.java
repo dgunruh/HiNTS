@@ -14,6 +14,7 @@ import com.sun.corba.se.spi.orbutil.fsm.Guard.Result;
 
 import classes.Nanoparticle;
 import classes.Sample;
+import util.Configuration;
 import util.Constants;
 //import org.apache.commons.math3.*;
 import org.apache.commons.math3.fitting.GaussianCurveFitter;
@@ -43,7 +44,13 @@ public class Setup {
 			for(int i=0; i<sample.nnanops; i++){
 				//System.out.println(lines);
 				//line = Arrays.asList(lines.get(i+4).split(" ")); Moule style
-				line = Arrays.asList(lines.get(i+6).split(", "));
+				if(!sample.necking) {
+					line = Arrays.asList(lines.get(i+6).split(", "));
+				}
+				else {
+					line = Arrays.asList(lines.get(i+7).split(" "));
+				}
+				
 				//id = Integer.valueOf(line.get(0));
 				/*xcoord = Double.valueOf(line.get(3));
 				ycoord = Double.valueOf(line.get(4));
@@ -53,12 +60,21 @@ public class Setup {
 				ycoord = Double.valueOf(line.get(1)); //3 for Moule
 				zcoord = Double.valueOf(line.get(2)); //4 for Moule
 				
+				if(sample.necking){
+					xcoord = Double.valueOf(line.get(3));
+					ycoord = Double.valueOf(line.get(4));
+					zcoord = Double.valueOf(line.get(5));
+				}
+				
 				if (sample.latticeStructure == "Moule"){
 					xcoord = Double.valueOf(line.get(5)); //5 for Moule
 					ycoord = Double.valueOf(line.get(3)); //3 for Moule
 					zcoord = Double.valueOf(line.get(4)); //4 for Moule
 				}
 				diameter = Double.valueOf(line.get(3)); // in nm
+				if(sample.necking) {
+					diameter = Double.valueOf(line.get(6));
+				}
 				//System.out.println("diameter is: " + diameter);
 				//diameter = 5.0;
 				nanoparticles[i] = new Nanoparticle(xcoord, ycoord, zcoord, diameter, i, sample);
@@ -81,6 +97,8 @@ public class Setup {
 	*/
 	public static double getFWHM(Nanoparticle[] nanoparticles, Sample sample){
 		double FWHM;
+		
+		//Start by creating a histogram of the energy levels
 		int bins = 50;
 		double[] levels_eV = new double[sample.nnanops];
 		double[] levels = new double[sample.nnanops];
@@ -89,13 +107,10 @@ public class Setup {
 			levels_eV[i] = nanoparticles[i].getCB1()*Constants.rytoev; // levels in eV unit
 		}
 		Arrays.sort(levels);
-		//System.out.println(Arrays.toString(levels));
 		double[] levelCount = util.Utility.calcHistogram(levels, levels[0], levels[levels.length-1], bins);
 		double[] levelLinear = util.Utility.linearSpread(levels[0], levels[levels.length-1], bins);
-		//System.out.println(levelCount.length);
-		//System.out.println(Arrays.toString(levelCount));
-		//System.out.println(levelLinear.length);
-		//System.out.println(Arrays.toString(levelLinear));
+		
+		//Fit a gaussian curve to the histogram
 		GaussianCurveFitter fitter = GaussianCurveFitter.create();
 	    WeightedObservedPoints obs = new WeightedObservedPoints();
 	    for (int index = 0; index < levelLinear.length; index++) {
@@ -104,6 +119,7 @@ public class Setup {
 	    // bestFit = norm, mean, sigma  ---> return sigma ---> FWHM
 	    System.out.println("Sigma is: " + bestFit[2]*Constants.rytoev);
 		
+	    //Return the full width half max
 	    FWHM = bestFit[2]*2*Math.sqrt(2*Math.log(2));
 	    return FWHM; 
 	}

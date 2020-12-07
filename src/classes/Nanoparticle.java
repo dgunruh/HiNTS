@@ -15,6 +15,9 @@ public class Nanoparticle {
 	int nn; //number of nearest neighbors
 	Nanoparticle[] nearestNeighbors;  //nearest neighbor array
 	
+	int nnn; //number of next nearest neighbors
+	Nanoparticle[] nextNearestNeighbors;
+	
 	int cn; //number of closest neighbors
 	Nanoparticle[] closeNeighbors;  //close neighbor array
 	
@@ -98,6 +101,7 @@ public class Nanoparticle {
 					//calculate how the x and z components of the origin of that layer are shifted with respect to the first layer
 					double z_mod = y_layer*z_3*Constants.nmtobohr;
 					double x_mod = y_layer*x_3*Constants.nmtobohr;
+
 
 					//calculate the left and right electrode locations for the current NP
 					double z_left = m_edge*(x-x_mod - x0) + z_mod + z0 - Configuration.ligandLength*Constants.nmtobohr/2.0;
@@ -245,15 +249,32 @@ public class Nanoparticle {
 	*/
 	public double npnpdistance(Nanoparticle otherNP, Sample sample, boolean connected_z, boolean CenterToCenter) {
 		
-		double deltax, deltay,deltaz, distSquared;
+		double deltax = 0.0, deltay,deltaz = 0.0, distSquared;
 		double cellx = sample.cellx;
 		double celly = sample.celly;
 		double cellz = sample.cellz;
-		
-		if(Configuration.PERX)
+		if (Configuration.PERX) {
 			deltax = Math.min(Math.min(Math.abs(this.x-otherNP.x), Math.abs(this.x-(otherNP.x-cellx))), Math.abs(this.x-(otherNP.x+cellx)));
-		else
-			deltax = this.x - otherNP.x ;
+			if (Configuration.latticeStructure == "triclinic") {
+				if (Math.abs(deltax - Math.abs(this.x - otherNP.x)) > .1) {
+					double z_2 = Configuration.latticeBasisLength*Math.cos(sample.latticeAngleGamma);
+					int y_layer_other = (int) otherNP.id/(Configuration.x_nps*Configuration.z_nps);
+					int y_layer_this = (int) this.id/(Configuration.x_nps*Configuration.z_nps);
+					
+					int thisx_int = (int) (this.id - (y_layer_this*Configuration.x_nps*Configuration.z_nps))/Configuration.z_nps;
+					int otherx_int = (int) (otherNP.id - (y_layer_other*Configuration.x_nps*Configuration.z_nps))/Configuration.z_nps;
+					
+					//First correct for the distance that the deltaz calc will give
+					deltaz -= Math.abs(otherx_int - thisx_int)*z_2*Constants.nmtobohr;
+					
+					int delta_NP_xlayers = Math.abs(Configuration.x_nps - Math.abs(otherx_int - thisx_int));
+					deltaz += delta_NP_xlayers*z_2*Constants.nmtobohr;
+				}
+			}
+		}
+		else {
+			deltax = this.x - otherNP.x;
+		}
 		
 		if(Configuration.PERY)
 			deltay = Math.min(Math.min(Math.abs(this.y-otherNP.y), Math.abs(this.y-(otherNP.y-celly))), Math.abs(this.y-(otherNP.y+celly)));
@@ -261,14 +282,14 @@ public class Nanoparticle {
 			deltay = this.y - otherNP.y ;
 		
 		if(connected_z)
-			deltaz = Math.min(Math.min(Math.abs(this.z-otherNP.z), Math.abs(this.z-(otherNP.z-cellz))), Math.abs(this.z-(otherNP.z+cellz)));
+			deltaz += Math.min(Math.min(Math.abs(this.z-otherNP.z), Math.abs(this.z-(otherNP.z-cellz))), Math.abs(this.z-(otherNP.z+cellz)));
 		else
-			deltaz = this.z - otherNP.z ;
-			
+			deltaz += this.z - otherNP.z ;
+
 		distSquared = Math.pow(deltax, 2.0) + Math.pow(deltay, 2.0) + Math.pow(deltaz, 2.0);
 
 		if(distSquared==0){
-			System.out.println("NP-NP overlaps!");
+			//System.out.println("Same NP!");
 			return 0.0;
 		}else{
 			if(CenterToCenter)
@@ -278,6 +299,65 @@ public class Nanoparticle {
 		}
 		
 	}
+	
+	/**
+	@param point, sample
+	@return NP-point distance
+	@throws no exceptions
+	*/
+	public double nppointdistance(double[] point, Sample sample) {
+		
+		double deltax, deltay,deltaz = 0.0, distSquared;
+		double cellx = sample.cellx;
+		double celly = sample.celly;
+		double cellz = sample.cellz;
+		
+		if(Configuration.PERX) {
+			deltax = Math.min(Math.min(Math.abs(this.x-point[0]), Math.abs(this.x-(point[0]-cellx))), Math.abs(this.x-(point[0]+cellx)));
+			if (Configuration.latticeStructure == "triclinic") {
+				if (Math.abs(deltax - Math.abs(this.x - point[0])) > .1) {
+					double x_2 = Configuration.latticeBasisLength*Math.sin(sample.latticeAngleGamma);
+					double z_2 = Configuration.latticeBasisLength*Math.cos(sample.latticeAngleGamma);
+					double x_3 = Configuration.latticeBasisLength*(Math.cos(sample.latticeAngleBeta)-Math.cos(sample.latticeAngleAlpha)*Math.cos(sample.latticeAngleGamma))/Math.sin(sample.latticeAngleGamma);
+					double z_3 = Configuration.latticeBasisLength*Math.cos(sample.latticeAngleAlpha);
+					double y_3 = Math.sqrt(Math.pow(Configuration.latticeBasisLength,2.0)-Math.pow(x_3,2.0)-Math.pow(z_3,2.0));
+					int y_layer_point = (int) Math.round((point[1]-Configuration.latticeBasisLength*Constants.nmtobohr/2.0)/(y_3*Constants.nmtobohr));
+					int y_layer_np = (int) this.id/(Configuration.x_nps*Configuration.z_nps);
+					
+					double x_mod = y_layer_point*x_3;
+					
+					int npx_int = (int) (this.id - (y_layer_np*Configuration.x_nps*Configuration.z_nps))/Configuration.z_nps;
+					double point_deltax = point[0]*Constants.bohrtonm - x_mod;
+					
+					int pointx_int = (int) Math.round(point_deltax/x_2) - 1;
+					
+					//System.out.println("Point y layer: " + y_layer_point + " point y: " +point[1]*Constants.bohrtonm+" Point x layer: " + pointx_int + " point x: "+ point[0]*Constants.bohrtonm +"  point deltax: " + point_deltax + " point y: " + point[1]*Constants.bohrtonm);
+					//First correct for the distance that the deltaz calc will give
+					deltaz -= Math.abs(pointx_int - npx_int)*z_2*Constants.nmtobohr;
+					
+					int delta_NP_xlayers = Math.abs(Configuration.x_nps - Math.abs(pointx_int - npx_int));
+					deltaz += delta_NP_xlayers*z_2*Constants.nmtobohr;
+				}
+			}
+		}
+		else
+			deltax = this.x - point[0] ;
+		
+		if(Configuration.PERY)
+			deltay = Math.min(Math.min(Math.abs(this.y-point[1]), Math.abs(this.y-(point[1]-celly))), Math.abs(this.y-(point[1]+celly)));
+		else
+			deltay = this.y - point[1] ;
+		
+		if(Configuration.PERZ)
+			deltaz += Math.min(Math.min(Math.abs(this.z-point[2]), Math.abs(this.z-(point[2]-cellz))), Math.abs(this.z-(point[2]+cellz)));
+		else
+			deltaz += this.z - point[2] ;
+			
+		distSquared = Math.pow(deltax, 2.0) + Math.pow(deltay, 2.0) + Math.pow(deltaz, 2.0);
+
+		return Math.pow(distSquared, 0.5);
+	}
+		
 	
 	/**
 	@param otherNP, sample, if periodic in z, if center to center

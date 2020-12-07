@@ -2,6 +2,7 @@ package classes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Map;
 
 import util.Configuration;
 import util.Constants;
@@ -17,7 +18,8 @@ public class Electron extends Charge {
 	}
 	
 	
-	
+	//This method tabulates all possible transport events that the hole can execute. These include:
+	//cluster hoppings, miller-abrahams transitions, metallic transitions, and necked transitions.
 	public double lookForEvents(Sample sample) {
 		double degeneracy;
 		double netDistance;
@@ -51,9 +53,9 @@ public class Electron extends Charge {
 		
 		//add necking transport next
 		if(sourceNP.neckedNeighbors.length != 0) {
-			System.out.println("Adding necking");
+			//System.out.println("Adding necking");
 			for(Nanoparticle neighborNP : sourceNP.neckedNeighbors) {
-				System.out.println("Necked transport!");
+				//System.out.println("Necked transport!");
 				for(int band = 0; band < sample.nbnd; band++) {
 					//band is target orbital
 					double energy_diff = 0.0;
@@ -73,41 +75,42 @@ public class Electron extends Charge {
 					
 					double neckRadius = sourceNP.neckRadiusMap.get(neighborNP);
 					double diameter = (sourceNP.diameter + neighborNP.diameter)/2.0;
+					double thisNP_electron_density = sourceNP.occupationTotalElectron/(Math.PI/6.0*Math.pow(sourceNP.diameter, 3.0));
+					double neighborNP_electron_density = (neighborNP.occupationTotalElectron + 1)/(Math.PI/6.0*Math.pow(neighborNP.diameter, 3.0));
+					//double electron_density = sample.nelec/(sample.cellx*sample.celly*sample.cellz);
+					double electron_density = (thisNP_electron_density + neighborNP_electron_density)/2.0;
+					double matrixElement = 9*electron_density*Math.pow(neckRadius, 3.0)/(Configuration.emass*Math.pow(diameter, 2.0));  //9*hbar^2*n*rho^3/(m^* * d^2)
+					
 					double overlap_energy = sample.ediff_neck_thr*2*neckRadius/diameter; //Scale proportionally to neck thickness
-					//System.out.println("Overlap energy is: " + overlap_energy);
+					//double overlap_energy = 2*matrixElement;
+					//System.out.println("Overlap energy is: " + overlap_energy*Constants.rytoev);
 					//System.out.println("kT is: " + sample.temperature);
 					//double overlap_energy = sample.temperature
 					
-					if(energy_diff <= overlap_energy && neighborNP.occupationCB[band]<neighborNP.occupationMAX[band] ){
+					if(energy_diff <= overlap_energy && neighborNP.occupationCB[band]<neighborNP.occupationMAX[band] && netDistance >= 0.0){
 						
 						newEvent = new HoppingEvent(this, neighborNP, sourceNP, band, sourceOrbital, false);
 						degeneracy = (double) (neighborNP.occupationMAX[band] - neighborNP.occupationCB[band]) ; 
-						
-						double thisNP_electron_density = sourceNP.occupationTotalElectron/(Math.PI/6.0*Math.pow(sourceNP.diameter, 3.0));
-						double neighborNP_electron_density = (neighborNP.occupationTotalElectron + 1)/(Math.PI/6.0*Math.pow(neighborNP.diameter, 3.0));
-						//double electron_density = sample.nelec/(sample.cellx*sample.celly*sample.cellz);
-						double electron_density = (thisNP_electron_density + neighborNP_electron_density)/2.0;
-						double matrixElement = 9*electron_density*Math.pow(neckRadius, 3.0)/(Configuration.emass*Math.pow(diameter, 2.0));  //9*hbar^2*n*rho^3/(m^* * d^2)
-						
 						newRate = 2*Math.PI*Math.pow(matrixElement, 2.0)*degeneracy;
 						newEvent.setRate(newRate);
 						this.hoppings.add(newEvent);
+						//System.out.println("<overlap necking rate: " + newRate);
 						ratesOnCharge += newRate ;
 					}
 					else if(energy_diff > overlap_energy && neighborNP.occupationCB[band]<neighborNP.occupationMAX[band]) {
 						newEvent = new HoppingEvent(this, neighborNP, sourceNP, band, sourceOrbital, false);
 						degeneracy = (double) (neighborNP.occupationMAX[band] - neighborNP.occupationCB[band]) ; 
-						double thisNP_electron_density = sourceNP.occupationTotalElectron/(Math.PI/6.0*Math.pow(sourceNP.diameter, 3.0));
-						double neighborNP_electron_density = (neighborNP.occupationTotalElectron + 1)/(Math.PI/6.0*Math.pow(neighborNP.diameter, 3.0));
-						//double electron_density = sample.nelec/(sample.cellx*sample.celly*sample.cellz);
-						double electron_density = (thisNP_electron_density + neighborNP_electron_density)/2.0;
-						double matrixElement = 9*electron_density*Math.pow(neckRadius, 3.0)/(Configuration.emass*Math.pow(diameter, 2.0));
-						
 						double thermal_activation = Math.exp(-energy_diff/sample.temperature);
 						newRate = 2*Math.PI*Math.pow(matrixElement, 2.0)*degeneracy*thermal_activation; //make sure rate crosses over from hopping
 						newEvent.setRate(newRate);
 						this.hoppings.add(newEvent);
 						ratesOnCharge += newRate ;
+						//System.out.println(">overlap necking rate: " + newRate);
+					}
+					else {
+						newEvent = new HoppingEvent(this, neighborNP, sourceNP, band, sourceOrbital, false);
+						newEvent.setRate(0.0);
+						this.hoppings.add(newEvent);
 					}
 				}
 			}
@@ -125,6 +128,7 @@ public class Electron extends Charge {
 						newEvent.setRate(newRate);
 						this.hoppings.add(newEvent);
 						ratesOnCharge += newRate;
+						//System.out.println("Hopping rate: " + newRate);
 					}
 				}
 			}
@@ -190,19 +194,23 @@ public class Electron extends Charge {
 	private double nearestNeighborPoisson(Nanoparticle targetNP, Nanoparticle sourceNP, Sample sample) {
 		double nnPoisson=0;
 		double ccdistance; 
-	    // for the electron before hopping this comes with negative sign as this is subtracted
+		// energy = 1/2*e*V, and V = e/(4*pi*e0*eout*d). e0 = 1/(4*pi) in Rydberg units
+		// Note: the polarization charge on the nearest neighbors has no effect. It leaves the monopole term untouched, and higher order
+		// terms (e.g. dipole, quadrupole) are not relevant for an effective mass wavefunction solution
+	    
+		// for the electron before hopping this comes with negative sign as this is subtracted
 		for(Nanoparticle sourceNeighbor: sourceNP.nearestNeighbors){
 			ccdistance = sourceNP.centerDistanceMap.get(sourceNeighbor);
-			nnPoisson += -Constants.e2*(sourceNeighbor.occupationTotalElectron-sourceNeighbor.occupationTotalHoles) / sourceNeighbor.dcout / ccdistance;
+			nnPoisson += -Constants.e2*(sourceNeighbor.occupationTotalElectron-sourceNeighbor.occupationTotalHoles) / (2 * sourceNeighbor.dcout * ccdistance);
 		}
 		// for the electron after hopping
 		for(Nanoparticle targetNeighbor: targetNP.nearestNeighbors){
 			ccdistance = targetNP.centerDistanceMap.get(targetNeighbor);
 			
 			if(targetNeighbor==sourceNP)
-				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron - targetNeighbor.occupationTotalHoles -1) / targetNeighbor.dcout / ccdistance;	
+				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron - 1 - targetNeighbor.occupationTotalHoles) / (2 * targetNeighbor.dcout * ccdistance);	
 			else
-				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron- targetNeighbor.occupationTotalHoles) / targetNeighbor.dcout / ccdistance;
+				nnPoisson += Constants.e2*(targetNeighbor.occupationTotalElectron- targetNeighbor.occupationTotalHoles) / (2 * targetNeighbor.dcout * ccdistance);
 		}
 		return nnPoisson;
 	}
@@ -210,14 +218,54 @@ public class Electron extends Charge {
     private double calculateRate(Nanoparticle targetNP, Nanoparticle sourceNP, int targetOrbital, int sourceOrbital, Sample sample){
     	double energy_diff = 0.0;
     	double rate = 0, overlap;
-    	double npdistance = targetNP.edgeDistanceMap.get(sourceNP);
-    	if (npdistance < 0) {
+    	double npdistance = 0.0;
+		//System.out.println("targetNP id: " + targetNP.id + " sourceNP id: " + sourceNP.id);
+		try {
+			npdistance = targetNP.edgeDistanceMap.get(sourceNP);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			//System.out.println("Target id: " + targetNP.id + " source id: " + sourceNP.id);
+			//e.printStackTrace();
+			System.out.println(e.getMessage());
+			System.out.println("ERROR!! target id: " + targetNP.id + " source id: " + sourceNP.id);
+			System.out.println("npnpdistance in 1 direction is: " + sourceNP.npnpdistance(targetNP, sample, true, false)*Constants.bohrtonm);
+			System.out.println("npnpdistance in other direction is: " + targetNP.npnpdistance(sourceNP, sample, true, false)*Constants.bohrtonm);
+			System.out.print("Neighbor ids in edgeDistanceMap: ");
+			for ( Map.Entry<Nanoparticle, Double> entry : targetNP.edgeDistanceMap.entrySet()) {
+				Nanoparticle neighbor = entry.getKey();
+				System.out.print(" " + neighbor.id);
+			}
+			System.out.print("\n");
+		}
+		if (npdistance < 0) {
+			double deltax, deltaz = 0.0;
+			deltax = Math.min(Math.min(Math.abs(targetNP.x-sourceNP.x), Math.abs(targetNP.x-(sourceNP.x-sample.cellx))), Math.abs(targetNP.x-(sourceNP.x+sample.cellx)));
+			if (Configuration.latticeStructure == "triclinic") {
+				//System.out.println("deltax: " + deltax);
+				if (Math.abs(deltax - Math.abs(sourceNP.x - targetNP.x)) > .1) {
+					double z_2 = Configuration.latticeBasisLength*Math.cos(sample.latticeAngleGamma);
+					
+					int y_layer_other = (int) targetNP.id/(Configuration.x_nps*Configuration.z_nps);
+					int y_layer_this = (int) sourceNP.id/(Configuration.x_nps*Configuration.z_nps);
+					
+					int thisx_int = (int) (sourceNP.id - (y_layer_this*Configuration.x_nps*Configuration.z_nps))/Configuration.z_nps;
+					int otherx_int = (int) (targetNP.id - (y_layer_other*Configuration.x_nps*Configuration.z_nps))/Configuration.z_nps;
+					
+					//First correct for the distance that the deltaz calc will give
+					deltaz -= Math.abs(otherx_int - thisx_int)*z_2;
+					
+					int delta_NP_xlayers = Math.abs(Configuration.x_nps - Math.abs(otherx_int - thisx_int));
+					deltaz += delta_NP_xlayers*z_2*Constants.nmtobohr;
+				}
+			}
+			deltaz += Math.min(Math.min(Math.abs(targetNP.z-sourceNP.z), Math.abs(targetNP.z-(sourceNP.z-sample.cellz))), Math.abs(targetNP.z-(sourceNP.z+sample.cellz)));
     		System.out.println("nanoparticles too close");
     		System.out.println("NP 1: " + targetNP.id +" NP 2: " + sourceNP.id);
-    		System.out.println("deltax: " + (targetNP.x - sourceNP.x)*Constants.bohrtonm);
-    		System.out.println("deltay: " + (targetNP.y - sourceNP.y)*Constants.bohrtonm);
-    		System.out.println("deltaz: " + (targetNP.z - sourceNP.z)*Constants.bohrtonm);
-    		System.out.println(Math.min(Math.min(Math.abs(targetNP.z-sourceNP.z), Math.abs(targetNP.z-(sourceNP.z-sample.cellz))), Math.abs(targetNP.z-(sourceNP.z+sample.cellz)))*Constants.bohrtonm);
+    		System.out.println("deltax: " + Math.min(Math.min(Math.abs(targetNP.x-sourceNP.x), Math.abs(targetNP.x-(sourceNP.x-sample.cellx))), Math.abs(targetNP.x-(sourceNP.x+sample.cellx)))*Constants.bohrtonm);
+    		System.out.println("deltay: " + Math.min(Math.min(Math.abs(targetNP.y-sourceNP.y), Math.abs(targetNP.y-(sourceNP.y-sample.celly))), Math.abs(targetNP.y-(sourceNP.y+sample.celly)))*Constants.bohrtonm);
+    		System.out.println("deltaz: " + deltaz*Constants.bohrtonm);
+    		//System.out.println(Math.min(Math.min(Math.abs(targetNP.z-sourceNP.z), Math.abs(targetNP.z-(sourceNP.z-sample.cellz))), Math.abs(targetNP.z-(sourceNP.z+sample.cellz)))*Constants.bohrtonm);
+    		System.out.println("Sample number: " + sample.sample_number);
     		System.out.println("diameter 1: " + targetNP.diameter*Constants.bohrtonm + " diameter 2: " + sourceNP.diameter*Constants.bohrtonm);
     	}
     	//if (npdistance < 0) npdistance = Configuration.ligandLength*Constants.nmtobohr; 
@@ -226,6 +274,7 @@ public class Electron extends Charge {
     	
     	// On-Site charging energy
     	energy_diff += calculateCharging(targetNP, sourceNP, sample);
+    	
     	//System.out.println("Charging energy is: " + calculateCharging(targetNP, sourceNP, sample)*Constants.rytoev);
     	
     	// Electron-hole exciton interaction
@@ -233,6 +282,7 @@ public class Electron extends Charge {
     	if(calculateExciton(targetNP, sourceNP, sample) != 0.0) System.out.println("exciton was used");
     	
     	// External potential
+    	
     	switch(Configuration.transportDirection) {
     		case "z":
     			energy_diff += charge*(sample.voltage/sample.cellz)*(targetNP.z-sourceNP.z-sample.cellz*Math.round((targetNP.z-sourceNP.z)/sample.cellz));
@@ -240,7 +290,6 @@ public class Electron extends Charge {
     		case "x":
     			energy_diff += charge*(sample.voltage/sample.cellx)*(targetNP.x-sourceNP.x-sample.cellx*Math.round((targetNP.x-sourceNP.x)/sample.cellx));
     			break;
-    			
     		case "y":
     			energy_diff += charge*(sample.voltage/sample.celly)*(targetNP.y-sourceNP.y-sample.celly*Math.round((targetNP.y-sourceNP.y)/sample.celly));
     			break;
@@ -252,7 +301,8 @@ public class Electron extends Charge {
         if(sample.poissonSolver=="nn")
         	energy_diff += nearestNeighborPoisson(targetNP, sourceNP, sample);
         
-        overlap = Math.sqrt(-sample.emass*(sourceNP.cbenergy[sourceOrbital] + targetNP.cbenergy[targetOrbital]) / 2.0) ;
+        //was sample.emass/2.0, which was a mistake
+        overlap = Math.sqrt(-sample.emass*(sourceNP.cbenergy[sourceOrbital] + targetNP.cbenergy[targetOrbital])) ;
         
         //System.out.println("Energy diff is: " + energy_diff*Constants.rytoev);
         //npdistance = .4*Constants.nmtobohr;
@@ -270,22 +320,13 @@ public class Electron extends Charge {
 				System.out.println("hitting it");
 			}
 			
-			//This is an implementation of the overlap energy for samples with disorder. A stopgap measure
+			//This is an implementation of the overlap energy for samples with disorder
 			if(energy_diff > sample.ediff_hopping_thr) {
 				rate = rate*Math.exp(-energy_diff/sample.temperature);
-				//System.out.println("Rate is: " + rate);
-				//System.out.println("temperature limited step!");
 			}
 			else {
-				/*
-				System.out.println("kT: " + sample.temperature*Constants.rytoev);
-				System.out.println("NP separation: " + (targetNP.z - sourceNP.z)*Constants.bohrtonm);
-				System.out.println("cb energy diff: " + (targetNP.cbenergy[targetOrbital] - sourceNP.cbenergy[sourceOrbital])*Constants.rytoev);
-				System.out.println("charging energy diff: " + calculateCharging(targetNP, sourceNP, sample)*Constants.rytoev);
-				System.out.println("voltage diff: " + charge*(sample.voltage/sample.cellz)*(targetNP.z-sourceNP.z-sample.cellz*Math.round((targetNP.z-sourceNP.z)/sample.cellz))*Constants.rytoev);
-				System.out.println("WKB term: " + Math.exp(-2.0*npdistance*overlap));
-				*/
-				//only allow forward or sideways transport
+				//only allow forward or sideways transport. Important if metallic channels are present to maintain a forward bias strong
+				//enough to measure the mobility accurately
 				double netDistance = (targetNP.z-sourceNP.z-sample.cellz*Math.round((targetNP.z-sourceNP.z)/sample.cellz));
 				if(netDistance < 0) {
 					rate = 0.0;
