@@ -1,6 +1,6 @@
 package util;
 
-import com.sun.org.apache.bcel.internal.generic.NEW;
+//import com.sun.org.apache.bcel.internal.generic.NEW;
 
 public class Configuration {
 	
@@ -22,14 +22,14 @@ public class Configuration {
 	public static final boolean PERX = true; //whether the structure is periodic in hopping in x
 	public static final boolean PERY = false; //whether the structure is periodic in hopping in y
 	public static final boolean PERZ = true; //whether the structure is periodic in hopping in z
-	public static final int x_nps = 20;
+	public static final int x_nps = 15;
 	public static final int y_nps = 2;
-	public static final int z_nps = 20;
-	public static final double latticeAngleGamma = 96.0*Math.PI/180.0; //lattice basis angle in radians //96 for Moule //99 for tridens
-	public static final double latticeAngleAlpha = 103.0*Math.PI/180.0; //lattice basis angle in radians //103 for Moule //99 for tridens
-	public static final double latticeAngleBeta = 95.0*Math.PI/180.0; //lattice basis angle in radians //95 for Moule //99 for tridens
+	public static final int z_nps = 15;
+	public static final double latticeAngleGamma = 90.0*Math.PI/180.0; //lattice basis angle in radians //96 for Moule //99 for tridens
+	public static final double latticeAngleAlpha = 90.0*Math.PI/180.0; //lattice basis angle in radians //103 for Moule //99 for tridens
+	public static final double latticeAngleBeta = 90.0*Math.PI/180.0; //lattice basis angle in radians //95 for Moule //99 for tridens
 	public static final String latticeStructure = "cubic"; //"triclinic" or "cubic" or "Moule". Was triclinic for Moule project
-	public static final double latticeBasisLength = 6.6; //in nm
+	public static final double latticeBasisLength = 4.7; //in nm
 	public static final String transportDirection = "z"; //"x", "y", or "z"
 	
 	//Necking NOT USED CURRENTLY
@@ -43,11 +43,11 @@ public class Configuration {
 	public static final double edgeDistThr = 3.5; //in nm
 		
 	// NP
-	public static final double near_n_distThr = 1.57; //in nm, for cubic
+	public static final double near_n_distThr = 2.0; //in nm, for cubic. Was 1.57
 	public static final double nextn_n_distThr = 4.0; //in nm, for cubic. Was 3.2
 	public static final double bradii = 47.0;
 	public static final double reorgenergy = 0.05;
-	public static final double jumpFreq = 0.6/7.8; //nu, tune to adjust mobility values. Was 0.7 for comparison to Kang, 1.0 normal. Was 0.58 for .0015 filling
+	public static final double jumpFreq = 1.0;//0.6/7.8; //nu, tune to adjust mobility values. Was 0.6/7.8 for comparison to Kang, 1.0 normal. Was 0.58 for .0015 filling
 	public static final double marcusprefac2 = 1.0;
 	public static final double capacitance = 0.05; //capacitance is used if capacitance_model = 'zunger'
 	public static final double screeningFactor = 1.0; //screening factor to change charging energy

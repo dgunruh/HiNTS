@@ -265,9 +265,9 @@ public class Sample {
     	
     	if(!bimodal){
     		//String prefix = "c:/Users/Davis/Research/Superlattice Project/npSolids/";
-    		String prefix = "c:/Users/Davis/GitHub/HiNTS/data/nanoparticles_cubicSL_PaperSamples_percent/";
+    		String prefix = "c:/Users/dunru/GitHub/HiNTS/data/";
     		String middle = folderName; //_.03D"; // looking at grain boundaries
-    		String end = "/nanoparticles" + sample_number + ".inp";
+    		String end = "/npSample" + sample_number + ".inp";
     		if(necking) {
     			end = "/npSample" + sample_number + ".inp";
     		}
@@ -308,7 +308,7 @@ public class Sample {
     	      // Loop just in case the file is > Long.MAX_VALUE or skip() decides to not read the entire file
     	   }
     	   
-    	   nnanops = count.getLineNumber() - 6; // +1 because line index starts at 0, -6 for starting lines, -1 because ends in empty line
+    	   nnanops = count.getLineNumber() - 7; // +1 because line index starts at 0, -7 for starting lines, -1 because ends in empty line
     	   if(necking) {
     		   nnanops -= 1;
     	   }

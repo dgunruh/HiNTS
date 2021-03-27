@@ -113,24 +113,25 @@ public class App {
 
 	public static void main(String[] args) throws FileNotFoundException {
 		
-		int numberOfSamples = 100; //total number of samples including flipped ones. If not pre-flipped, this is the total expected number
-		String numberOfNanoparticles = "800"; //expected number
+		int numberOfSamples = 200; //total number of samples including flipped ones. If not pre-flipped, this is the total expected number
+		String numberOfNanoparticles = "450"; //expected number
 		int sampleStart = 0;
 		String npArraySize = "20x2x20";
 		String eDensity = ".0016";
-		String diameter = "6.5";
+		String diameter = "3.5";
 		String defect = "twins";
-		double T = 200.0;
+		double T = 300.0;
 		boolean randomSeed = false; //whether our MersenneTwisterFast will always use the same seeds, or random seeds
 		boolean necking = false; //whether the simulation samples will have necking or not
 		boolean preFlippedSamples = true; //whether pre-flipped pairs of samples are present or not. If not, do the flipping internally. 
 		
 		//These are the various types of runs that can be conducted
-		boolean multipleDiameters = true; //cycle through batches of NPs at different diameters
+		boolean multipleDiameters = false; //cycle through batches of NPs at different diameters
 		boolean repeatCalculations = false; //repeat mobility calculations for the same samples. Use random number as seed
 		boolean linearElectronFilling = false; //cycle through electron filling for samples
 		boolean ivCurve = false; //generate a curve of current versus voltage
 		boolean multipleTemperatures = false; //cycle through multiple temperatures
+		boolean multipleDisorders = true;
 		//if none of the above are "true", then will simply go through single batch of samples with no frills
 		
 		if(multipleDiameters) {
@@ -216,6 +217,86 @@ public class App {
 			}
 		}
 		
+		else if(multipleDisorders) {
+			// We have 450 (15x15x2) NPs, choose electron filling to be 0.5 e-/NP
+			int nelec = 225;
+			//The option exists to screen the charging energy
+			for(double screeningFactor = 1.0; screeningFactor <= 1.0; screeningFactor += 1.0) {
+				int j = 0;
+				
+				String title = "BinaryNSLpaper" + "\\" + Configuration.latticeStructure + diameter + "nm" +npArraySize + "_" + T + "K.txt";
+				PrintWriter writer = new PrintWriter(title);
+				writer.println("PercentDisorder Mobility(cm^2/Vs) Pair_STD");
+				
+				for(double pdisorder = .01; pdisorder <= .25; pdisorder = pdisorder + 0.01) {
+					//double diam = 3.5; //nm
+					System.out.println("nanoparticle % disorder: " + String.valueOf(pdisorder));
+					System.out.println("Number of electrons is " + nelec);
+					ExecutorService executor = Executors.newFixedThreadPool(16);
+					List<Future<Double[]>> futures = new ArrayList<>();
+					
+					String folderName = numberOfNanoparticles +"_" + diameter + "nm_" +String.format("%.2f",pdisorder) + "D";
+					if(preFlippedSamples) {
+						for(int i=0; i<numberOfSamples; i++){
+							futures.add(executor.submit(new Processor(folderName, i,false, T,nelec,screeningFactor, randomSeed, necking)));
+						}
+					}
+					else {
+						for(int i=0; i<numberOfSamples/2; i++){
+							futures.add(executor.submit(new Processor(folderName, i,2*i, false, T,nelec,screeningFactor, randomSeed, necking)));
+							futures.add(executor.submit(new Processor(folderName, i,2*i + 1, true, T,nelec,screeningFactor, randomSeed, necking)));
+						}
+						
+					}
+					
+					// Stop accepting new tasks. Wait for all threads to terminate.
+					executor.shutdown();
+					System.out.println("All tasks submitted.");
+		
+					// wait for the processes to finish. Setting a time out limit of 1 day.
+					try {
+						executor.awaitTermination(1, TimeUnit.DAYS);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					System.out.println("All tasks completed.");
+		
+					//Process the results by averaging over the pairs of regular and inverted samples
+					List<Double[]> resultRaw = new ArrayList<>();
+					for(Future<Double[]> future: futures){
+						try {
+							resultRaw.add(future.get());
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						} catch (ExecutionException e) {
+							e.printStackTrace();
+						}
+					}
+					System.out.println(resultRaw);
+					double[] resultProcessed = Utility.processResult(resultRaw);
+					double total = 0.0;
+					for(int i = 0; i < resultProcessed.length; i++) {
+						total += resultProcessed[i];
+					}
+					
+					//Get the mean, variance, and std
+					double mean = total/resultProcessed.length;
+					double variance = 0.0;
+					for(int i=0; i< resultProcessed.length;i++) {
+						variance += Math.pow((resultProcessed[i]-mean),2);
+					}
+					double std = Math.sqrt(variance/(resultProcessed.length-1));
+					double std_mean =  std/Math.sqrt(resultProcessed.length);
+	
+					//Output the result
+					String toAdd = String.valueOf(pdisorder) + " " + mean + " " + std_mean;
+					writer.println(toAdd);
+					j += 1;
+				}
+				writer.close();
+			}
+		}
 		else if(linearElectronFilling) {
 			double screeningFactor = 1.0;
 			String title = "Cubic Results" + "\\" + Configuration.latticeStructure + "_" +diameter + "nm" +npArraySize + "_" + eDensity + "_" + T + "K_screeningFactor" + screeningFactor +".txt";

@@ -10,7 +10,7 @@ import java.util.Map;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.Files;
-import com.sun.corba.se.spi.orbutil.fsm.Guard.Result;
+//import com.sun.corba.se.spi.orbutil.fsm.Guard.Result;
 
 import classes.Nanoparticle;
 import classes.Sample;
@@ -45,7 +45,7 @@ public class Setup {
 				//System.out.println(lines);
 				//line = Arrays.asList(lines.get(i+4).split(" ")); Moule style
 				if(!sample.necking) {
-					line = Arrays.asList(lines.get(i+6).split(", "));
+					line = Arrays.asList(lines.get(i+7).split(" "));
 				}
 				else {
 					line = Arrays.asList(lines.get(i+7).split(" "));
@@ -56,9 +56,9 @@ public class Setup {
 				ycoord = Double.valueOf(line.get(4));
 				zcoord = Double.valueOf(line.get(5));*/
 				
-				xcoord = Double.valueOf(line.get(0)); //5 for Moule
-				ycoord = Double.valueOf(line.get(1)); //3 for Moule
-				zcoord = Double.valueOf(line.get(2)); //4 for Moule
+				xcoord = Double.valueOf(line.get(3)); //5 for Moule
+				ycoord = Double.valueOf(line.get(4)); //3 for Moule
+				zcoord = Double.valueOf(line.get(5)); //4 for Moule
 				
 				if(sample.necking){
 					xcoord = Double.valueOf(line.get(3));
@@ -71,7 +71,7 @@ public class Setup {
 					ycoord = Double.valueOf(line.get(3)); //3 for Moule
 					zcoord = Double.valueOf(line.get(4)); //4 for Moule
 				}
-				diameter = Double.valueOf(line.get(3)); // in nm
+				diameter = Double.valueOf(line.get(6)); // in nm
 				if(sample.necking) {
 					diameter = Double.valueOf(line.get(6));
 				}
